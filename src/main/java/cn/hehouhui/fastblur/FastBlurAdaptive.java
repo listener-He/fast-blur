@@ -133,7 +133,7 @@ public class FastBlurAdaptive extends FastBlurBase {
         if (data.length <= 256) {
             // 小数据使用极速版本
             return fastVersion.encrypt(data);
-        } else if (data.length <= 2048) {
+        } else if (data.length <= 4096) {
             // 中等数据使用向量化版本
             return vectorizedVersion.encrypt(data);
         } else {
@@ -160,7 +160,7 @@ public class FastBlurAdaptive extends FastBlurBase {
         if (encryptedData.length <= 256) {
             // 小数据使用极速版本
             return fastVersion.decrypt(encryptedData);
-        } else if (encryptedData.length <= 2048) {
+        } else if (encryptedData.length <= 4096) {
             // 中等数据使用向量化版本
             return vectorizedVersion.decrypt(encryptedData);
         } else {

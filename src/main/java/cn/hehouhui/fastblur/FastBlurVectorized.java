@@ -387,12 +387,8 @@ public class FastBlurVectorized extends FastBlurBase {
         System.arraycopy(data, 0, dataCopy, 0, data.length);
         
         // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
         
         return dataCopy;
     }
@@ -415,12 +411,8 @@ public class FastBlurVectorized extends FastBlurBase {
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
         
         // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
         
         return dataCopy;
     }
@@ -429,7 +421,7 @@ public class FastBlurVectorized extends FastBlurBase {
      * 加密任务（用于并行处理）
      */
     private static class EncryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 4096; // 任务阈值：4KB
         private static final long serialVersionUID = -1134508474606636622L;
         private final byte[] data;
         private final int start;
@@ -551,7 +543,7 @@ public class FastBlurVectorized extends FastBlurBase {
      * 解密任务（用于并行处理）
      */
     private static class DecryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 4096; // 任务阈值：4KB
         private static final long serialVersionUID = 6527346346469821233L;
         private final byte[] data;
         private final int start;

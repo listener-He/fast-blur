@@ -136,8 +136,13 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 根据配置决定是否使用并行处理
-        if (parallelProcessing && data.length >= 8192) {
+        if (parallelProcessing && data.length >= 32768) {
             return encryptParallel(data);
+        }
+
+        // 对于小数据(<=64字节)，使用展开循环优化
+        if (data.length <= 64) {
+            return encryptUnrolled(data);
         }
 
         // 直接在原数组上操作，避免数组复制开销
@@ -152,6 +157,57 @@ public class FastBlurSimple extends FastBlurBase {
                 data[i] = (byte) (shifted & 0xFF);
             }
         }
+        return data;
+    }
+
+    /**
+     * 展开循环的小数据加密方法
+     * 专门为小数据(<=64字节)优化性能
+     *
+     * @param data 原始字节数组
+     * @return 加密后字节数组
+     */
+    private byte[] encryptUnrolled(byte[] data) {
+        final int len = data.length;
+        
+        // 展开循环以减少分支开销
+        int i = 0;
+        for (; i <= len - 4; i += 4) {
+            // 处理4个字节
+            data[i] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i] & 0xFF;
+                data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+1] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+1] & 0xFF;
+                data[i+1] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+2] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+2] & 0xFF;
+                data[i+2] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+3] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+3] & 0xFF;
+                data[i+3] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+        }
+        
+        // 处理剩余字节
+        for (; i < len; i++) {
+            data[i] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i] & 0xFF;
+                data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+        }
+        
         return data;
     }
 
@@ -180,8 +236,13 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 根据配置决定是否使用并行处理
-        if (parallelProcessing && encryptedData.length >= 8192) {
+        if (parallelProcessing && encryptedData.length >= 32768) {
             return decryptParallel(encryptedData);
+        }
+
+        // 对于小数据(<=64字节)，使用展开循环优化
+        if (encryptedData.length <= 64) {
+            return decryptUnrolled(encryptedData);
         }
 
         // 直接在原数组上操作，避免数组复制开销
@@ -196,6 +257,57 @@ public class FastBlurSimple extends FastBlurBase {
             // 逆步骤1：密钥异或
             encryptedData[i] ^= key;
         }
+        return encryptedData;
+    }
+
+    /**
+     * 展开循环的小数据解密方法
+     * 专门为小数据(<=64字节)优化性能
+     *
+     * @param encryptedData 加密后的字节数组
+     * @return 原始字节数组
+     */
+    private byte[] decryptUnrolled(byte[] encryptedData) {
+        final int len = encryptedData.length;
+        
+        // 展开循环以减少分支开销
+        int i = 0;
+        for (; i <= len - 4; i += 4) {
+            // 处理4个字节
+            if (shift != 0) {
+                int unsigned = encryptedData[i] & 0xFF;
+                encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+1] & 0xFF;
+                encryptedData[i+1] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+1] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+2] & 0xFF;
+                encryptedData[i+2] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+2] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+3] & 0xFF;
+                encryptedData[i+3] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+3] ^= key;
+        }
+        
+        // 处理剩余字节
+        for (; i < len; i++) {
+            if (shift != 0) {
+                int unsigned = encryptedData[i] & 0xFF;
+                encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i] ^= key;
+        }
+        
         return encryptedData;
     }
 
@@ -216,13 +328,9 @@ public class FastBlurSimple extends FastBlurBase {
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
         
-        // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, key, shift));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool pool = ForkJoinPool.commonPool();
+        pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, key, shift));
         
         return dataCopy;
     }
@@ -244,13 +352,9 @@ public class FastBlurSimple extends FastBlurBase {
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
         
-        // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, key, shift));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool pool = ForkJoinPool.commonPool();
+        pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, key, shift));
         
         return dataCopy;
     }
@@ -270,7 +374,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 8192) {
+        if (parallelProcessing && length >= 32768) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -310,7 +414,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 8192) {
+        if (parallelProcessing && length >= 32768) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -349,7 +453,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 8192) {
+        if (parallelProcessing && length >= 32768) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -389,7 +493,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 8192) {
+        if (parallelProcessing && length >= 32768) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -417,7 +521,7 @@ public class FastBlurSimple extends FastBlurBase {
      * 加密任务（用于并行处理）
      */
     private static class EncryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 16384; // 任务阈值：16KB
         private static final long serialVersionUID = -1180001722974992448L;
         private final byte[] data;
         private final int start;
@@ -459,7 +563,7 @@ public class FastBlurSimple extends FastBlurBase {
      * 解密任务（用于并行处理）
      */
     private static class DecryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 16384; // 任务阈值：16KB
         private static final long serialVersionUID = -4052727379621115969L;
         private final byte[] data;
         private final int start;

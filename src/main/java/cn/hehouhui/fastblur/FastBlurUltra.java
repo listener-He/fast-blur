@@ -190,8 +190,13 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && data.length >= 8192) {
+        if (parallelProcessing && data.length >= 16384) {
             return encryptParallel(data);
+        }
+
+        // 对于小数据(<=256字节)，使用小数据优化方法
+        if (data.length <= 256) {
+            return encryptSmall(data);
         }
 
         // 直接在原数组上操作，避免数组复制开销
@@ -217,9 +222,9 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 小数据量快速加密方法（展开循环版本）
-     * 专门针对小于等于8字节的数据进行优化
+     * 专门针对小于等于256字节的数据进行优化
      *
-     * @param data 原始字节数组（长度必须<=8）
+     * @param data 原始字节数组（长度必须<=256）
      * @return 加密后字节数组
      */
     public byte[] encryptSmall(byte[] data) {
@@ -228,6 +233,12 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         final int len = data.length;
+        
+        // 对于大于64字节的数据，使用批量处理
+        if (len > 64) {
+            return encryptSmallBatch(data);
+        }
+        
         // 展开小循环以减少分支开销
         switch (len) {
             case 8:
@@ -250,6 +261,31 @@ public class FastBlurUltra extends FastBlurBase {
                 // 不应该到达这里
                 break;
         }
+        return data;
+    }
+
+    /**
+     * 批量处理的小数据加密方法
+     * 专门针对64-256字节的数据进行优化
+     *
+     * @param data 原始字节数组
+     * @return 加密后字节数组
+     */
+    private byte[] encryptSmallBatch(byte[] data) {
+        final int len = data.length;
+        final byte kp1 = keyPart1;
+        final byte kp2 = keyPart2;
+        final int mask = shiftMask;
+        
+        // 批量处理以减少函数调用开销
+        for (int i = 0; i < len; i++) {
+            int dynamicShift = (i + mask) & 0x7;
+            int b = data[i] & 0xFF;
+            int xored1 = b ^ (kp1 & 0xFF);
+            int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
+            data[i] = (byte) (shifted ^ (kp2 & 0xFF));
+        }
+        
         return data;
     }
 
@@ -279,8 +315,13 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && encryptedData.length >= 8192) {
+        if (parallelProcessing && encryptedData.length >= 16384) {
             return decryptParallel(encryptedData);
+        }
+
+        // 对于小数据(<=256字节)，使用小数据优化方法
+        if (encryptedData.length <= 256) {
+            return decryptSmall(encryptedData);
         }
 
         // 直接在原数组上操作，避免数组复制开销
@@ -306,9 +347,9 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 小数据量快速解密方法（展开循环版本）
-     * 专门针对小于等于8字节的数据进行优化
+     * 专门针对小于等于256字节的数据进行优化
      *
-     * @param encryptedData 加密后的字节数组（长度必须<=8）
+     * @param encryptedData 加密后的字节数组（长度必须<=256）
      * @return 原始字节数组
      */
     public byte[] decryptSmall(byte[] encryptedData) {
@@ -317,6 +358,12 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         final int len = encryptedData.length;
+        
+        // 对于大于64字节的数据，使用批量处理
+        if (len > 64) {
+            return decryptSmallBatch(encryptedData);
+        }
+        
         // 展开小循环以减少分支开销
         switch (len) {
             case 8:
@@ -339,6 +386,31 @@ public class FastBlurUltra extends FastBlurBase {
                 // 不应该到达这里
                 break;
         }
+        return encryptedData;
+    }
+
+    /**
+     * 批量处理的小数据解密方法
+     * 专门针对64-256字节的数据进行优化
+     *
+     * @param encryptedData 加密后的字节数组
+     * @return 原始字节数组
+     */
+    private byte[] decryptSmallBatch(byte[] encryptedData) {
+        final int len = encryptedData.length;
+        final byte kp1 = keyPart1;
+        final byte kp2 = keyPart2;
+        final int mask = shiftMask;
+        
+        // 批量处理以减少函数调用开销
+        for (int i = 0; i < len; i++) {
+            int dynamicShift = (i + mask) & 0x7;
+            int b = encryptedData[i] & 0xFF;
+            int xored1 = b ^ (kp2 & 0xFF);
+            int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
+            encryptedData[i] = (byte) (shifted ^ (kp1 & 0xFF));
+        }
+        
         return encryptedData;
     }
 
@@ -390,12 +462,8 @@ public class FastBlurUltra extends FastBlurBase {
         System.arraycopy(data, 0, dataCopy, 0, data.length);
 
         // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
 
         return dataCopy;
     }
@@ -418,12 +486,8 @@ public class FastBlurUltra extends FastBlurBase {
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
 
         // 使用ForkJoin框架进行并行处理
-        ForkJoinPool pool = new ForkJoinPool();
-        try {
-            pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
-        } finally {
-            pool.shutdown();
-        }
+        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
+        ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
 
         return dataCopy;
     }
@@ -432,7 +496,7 @@ public class FastBlurUltra extends FastBlurBase {
      * 加密任务（用于并行处理）
      */
     private static class EncryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 16384; // 任务阈值：16KB
         private static final long serialVersionUID = 9130525864140232216L;
         private final byte[] data;
         private final int start;
@@ -480,7 +544,7 @@ public class FastBlurUltra extends FastBlurBase {
      * 解密任务（用于并行处理）
      */
     private static class DecryptTask extends RecursiveAction {
-        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final int THRESHOLD = 16384; // 任务阈值：16KB
         private static final long serialVersionUID = 8201094641149163487L;
         private final byte[] data;
         private final int start;
