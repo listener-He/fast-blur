@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java Version](https://img.shields.io/badge/Java-8%2B-blue.svg)](https://www.oracle.com/java/technologies/javase-downloads.html)
 ![Performance](https://img.shields.io/badge/Performance-Blazing%20Fast-brightgreen)
-![English](README.md)
+[![English](https://img.shields.io/badge/English-README-blue.svg)](README.md)
 
 
 专为Java设计的高性能轻量级数据混淆库。FastBlur提供了一系列类加密算法，可在无需传统加密方法开销的情况下实现快速、可逆的数据转换。

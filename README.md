@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java Version](https://img.shields.io/badge/Java-8%2B-blue.svg)](https://www.oracle.com/java/technologies/javase-downloads.html)
 ![Performance](https://img.shields.io/badge/Performance-Blazing%20Fast-brightgreen)
-![简体中文](README_zh.md)
+[![简体中文](https://img.shields.io/badge/-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-red)](README_zh.md)
 
 High-performance, lightweight data obfuscation library for Java. FastBlur provides a suite of encryption-like algorithms that offer fast, reversible data transformation without the overhead of traditional cryptographic methods.
 
