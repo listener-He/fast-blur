@@ -11,10 +11,10 @@ import java.util.concurrent.RecursiveAction;
  * 简单轻量的混淆算法（优化版）
  * 高性能可逆轻量级加密工具（动态位移增强混淆，不保证安全性）
  * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
- * 
+ *
  * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
  * 相比原版进行了多项性能优化，适用于需要极致性能的轻量级数据保护场景。</p>
- * 
+ *
  * <p>优化点：
  * 1. 内联位移操作避免函数调用开销
  * 2. 预计算密钥片段避免重复计算
@@ -36,18 +36,18 @@ import java.util.concurrent.RecursiveAction;
  * @since 1.0
  */
 public class FastBlurOptimized extends FastBlurBase {
-    
-    
+
+
     /**
      * 预计算的密钥片段1（用于异或运算）
      */
     private final byte keyPart1;
-    
+
     /**
      * 预计算的密钥片段2（用于异或运算）
      */
     private final byte keyPart2;
-    
+
     /**
      * 用于位移计算的掩码
      */
@@ -55,7 +55,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurOptimized blur = new FastBlurOptimized();
@@ -68,7 +68,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码方式初始化FastBlurOptimized实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurOptimized blur = new FastBlurOptimized(StandardCharsets.UTF_8);
@@ -83,7 +83,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurOptimized实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurOptimized blur = new FastBlurOptimized(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB);
@@ -100,7 +100,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurOptimized实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurOptimized blur = new FastBlurOptimized(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB, true);
@@ -122,7 +122,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 动态计算位移位数（核心增强点）
-     * 
+     *
      * <p>根据字节索引和密钥分段值动态计算位移位数，确保结果在0-7之间。
      * 这种动态计算增加了算法的复杂度和安全性。</p>
      *
@@ -143,7 +143,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * 加密字节数组（动态位移增强混淆）
-     * 
+     *
      * <p>加密过程分为三个步骤：
      * 1. 使用密钥的第一部分与数据进行异或运算
      * 2. 对结果进行动态循环左移
@@ -179,17 +179,17 @@ public class FastBlurOptimized extends FastBlurBase {
         // 直接在原数组上操作，避免数组复制开销
         for (int i = 0; i < data.length; i++) {
             int dynamicShift = getDynamicShift(i);
-            
+
             // 步骤1：第一段密钥异或
             data[i] ^= keyPart1;
-            
+
             // 步骤2：动态循环左移（内联操作避免函数调用开销）
             if (dynamicShift != 0) {
                 int unsigned = data[i] & 0xFF;
                 int shifted = (unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift));
                 data[i] = (byte) (shifted & 0xFF);
             }
-            
+
             // 步骤3：第二段密钥异或
             data[i] ^= keyPart2;
         }
@@ -208,7 +208,7 @@ public class FastBlurOptimized extends FastBlurBase {
         final byte kp1 = keyPart1;
         final byte kp2 = keyPart2;
         final int mask = shiftMask;
-        
+
         // 展开循环以减少分支开销
         int i = 0;
         for (; i <= len - 4; i += 4) {
@@ -220,7 +220,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 data[i] = (byte) (((unsigned << dynamicShift0) | (unsigned >>> (8 - dynamicShift0))) & 0xFF);
             }
             data[i] ^= kp2;
-            
+
             int dynamicShift1 = ((i + 1) + mask) & 0x7;
             data[i+1] ^= kp1;
             if (dynamicShift1 != 0) {
@@ -228,7 +228,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 data[i+1] = (byte) (((unsigned << dynamicShift1) | (unsigned >>> (8 - dynamicShift1))) & 0xFF);
             }
             data[i+1] ^= kp2;
-            
+
             int dynamicShift2 = ((i + 2) + mask) & 0x7;
             data[i+2] ^= kp1;
             if (dynamicShift2 != 0) {
@@ -236,7 +236,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 data[i+2] = (byte) (((unsigned << dynamicShift2) | (unsigned >>> (8 - dynamicShift2))) & 0xFF);
             }
             data[i+2] ^= kp2;
-            
+
             int dynamicShift3 = ((i + 3) + mask) & 0x7;
             data[i+3] ^= kp1;
             if (dynamicShift3 != 0) {
@@ -245,7 +245,7 @@ public class FastBlurOptimized extends FastBlurBase {
             }
             data[i+3] ^= kp2;
         }
-        
+
         // 处理剩余字节
         for (; i < len; i++) {
             int dynamicShift = (i + mask) & 0x7;
@@ -256,13 +256,13 @@ public class FastBlurOptimized extends FastBlurBase {
             }
             data[i] ^= kp2;
         }
-        
+
         return data;
     }
 
     /**
      * 解密字节数组（加密的逆操作，动态位移还原）
-     * 
+     *
      * <p>解密是加密的逆向操作，其步骤顺序与加密相反：
      * 1. 使用密钥的第二部分与数据进行异或运算（逆向步骤3）
      * 2. 对结果进行动态循环右移（逆向步骤2）
@@ -298,17 +298,17 @@ public class FastBlurOptimized extends FastBlurBase {
         // 直接在原数组上操作，避免数组复制开销
         for (int i = 0; i < encryptedData.length; i++) {
             int dynamicShift = getDynamicShift(i);
-            
+
             // 逆步骤3：第二段密钥异或还原
             encryptedData[i] ^= keyPart2;
-            
+
             // 逆步骤2：动态循环右移（内联操作避免函数调用开销）
             if (dynamicShift != 0) {
                 int unsigned = encryptedData[i] & 0xFF;
                 int shifted = (unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift));
                 encryptedData[i] = (byte) (shifted & 0xFF);
             }
-            
+
             // 逆步骤1：第一段密钥异或还原
             encryptedData[i] ^= keyPart1;
         }
@@ -327,7 +327,7 @@ public class FastBlurOptimized extends FastBlurBase {
         final byte kp1 = keyPart1;
         final byte kp2 = keyPart2;
         final int mask = shiftMask;
-        
+
         // 展开循环以减少分支开销
         int i = 0;
         for (; i <= len - 4; i += 4) {
@@ -339,7 +339,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 encryptedData[i] = (byte) (((unsigned >>> dynamicShift0) | (unsigned << (8 - dynamicShift0))) & 0xFF);
             }
             encryptedData[i] ^= kp1;
-            
+
             int dynamicShift1 = ((i + 1) + mask) & 0x7;
             encryptedData[i+1] ^= kp2;
             if (dynamicShift1 != 0) {
@@ -347,7 +347,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 encryptedData[i+1] = (byte) (((unsigned >>> dynamicShift1) | (unsigned << (8 - dynamicShift1))) & 0xFF);
             }
             encryptedData[i+1] ^= kp1;
-            
+
             int dynamicShift2 = ((i + 2) + mask) & 0x7;
             encryptedData[i+2] ^= kp2;
             if (dynamicShift2 != 0) {
@@ -355,7 +355,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 encryptedData[i+2] = (byte) (((unsigned >>> dynamicShift2) | (unsigned << (8 - dynamicShift2))) & 0xFF);
             }
             encryptedData[i+2] ^= kp1;
-            
+
             int dynamicShift3 = ((i + 3) + mask) & 0x7;
             encryptedData[i+3] ^= kp2;
             if (dynamicShift3 != 0) {
@@ -364,7 +364,7 @@ public class FastBlurOptimized extends FastBlurBase {
             }
             encryptedData[i+3] ^= kp1;
         }
-        
+
         // 处理剩余字节
         for (; i < len; i++) {
             int dynamicShift = (i + mask) & 0x7;
@@ -375,13 +375,13 @@ public class FastBlurOptimized extends FastBlurBase {
             }
             encryptedData[i] ^= kp1;
         }
-        
+
         return encryptedData;
     }
 
     /**
      * 并行加密字节数组（用于处理大数据块）
-     * 
+     *
      * <p>将数据分块并行处理，充分利用多核CPU优势</p>
      *
      * @param data 原始字节数组
@@ -391,21 +391,21 @@ public class FastBlurOptimized extends FastBlurBase {
         if (data == null || data.length == 0) {
             return data;
         }
-        
+
         // 创建数据副本以避免修改原始数据
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
-        
+
         // 使用ForkJoin框架进行并行处理
         // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
         ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
-        
+
         return dataCopy;
     }
 
     /**
      * 并行解密字节数组（用于处理大数据块）
-     * 
+     *
      * <p>将数据分块并行处理，充分利用多核CPU优势</p>
      *
      * @param encryptedData 加密后的字节数组
@@ -415,15 +415,15 @@ public class FastBlurOptimized extends FastBlurBase {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
-        
+
         // 创建数据副本以避免修改原始数据
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
-        
+
         // 使用ForkJoin框架进行并行处理
         // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
         ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
-        
+
         return dataCopy;
     }
 
@@ -485,17 +485,17 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 直接处理数据块
                 for (int i = start; i < end; i++) {
                     int dynamicShift = (i + shiftMask) & 0x7;
-                    
+
                     // 步骤1：第一段密钥异或
                     data[i] ^= keyPart1;
-                    
+
                     // 步骤2：动态循环左移
                     if (dynamicShift != 0) {
                         int unsigned = data[i] & 0xFF;
                         int shifted = (unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift));
                         data[i] = (byte) (shifted & 0xFF);
                     }
-                    
+
                     // 步骤3：第二段密钥异或
                     data[i] ^= keyPart2;
                 }
@@ -537,17 +537,17 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 直接处理数据块
                 for (int i = start; i < end; i++) {
                     int dynamicShift = (i + shiftMask) & 0x7;
-                    
+
                     // 逆步骤3：第二段密钥异或还原
                     data[i] ^= keyPart2;
-                    
+
                     // 逆步骤2：动态循环右移
                     if (dynamicShift != 0) {
                         int unsigned = data[i] & 0xFF;
                         int shifted = (unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift));
                         data[i] = (byte) (shifted & 0xFF);
                     }
-                    
+
                     // 逆步骤1：第一段密钥异或还原
                     data[i] ^= keyPart1;
                 }
