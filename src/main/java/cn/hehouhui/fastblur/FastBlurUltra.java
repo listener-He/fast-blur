@@ -9,7 +9,7 @@ import java.util.concurrent.RecursiveAction;
 
 /**
  * 简单轻量的混淆算法（极速版）
- * 高性能可逆轻量级加密工具（动态位移增强混淆，不保证安全性）
+ * 高性能可逆轻量级加密工具（支持固定位移和动态位移增强混淆，不保证安全性）
  * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
  *
  * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
@@ -21,6 +21,7 @@ import java.util.concurrent.RecursiveAction;
  * 3. 预计算所有可能的位移结果
  * 4. 避免所有不必要的对象创建
  * 5. 利用CPU缓存友好的访问模式
+ * 6. 支持固定位移和动态位移两种模式
  * </p>
  *
  * <p>示例用法：
@@ -52,6 +53,11 @@ public class FastBlurUltra extends FastBlurBase {
      * 用于位移计算的掩码
      */
     private final int shiftMask;
+    
+    /**
+     * 固定位移值
+     */
+    private final int shift;
 
     /**
      * 左循环位移查找表
@@ -62,6 +68,11 @@ public class FastBlurUltra extends FastBlurBase {
      * 右循环位移查找表
      */
     private final byte[][] rightShiftTable;
+    
+    /**
+     * 是否启用动态位移
+     */
+    private final boolean dynamicShift;
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
@@ -88,11 +99,11 @@ public class FastBlurUltra extends FastBlurBase {
      * @param encoding 字符编码方式
      */
     public FastBlurUltra(Charset encoding) {
-        this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF));
+        this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF), false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurUltra实例
+     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurUltra实例（动态位移模式）
      *
      * <p>示例用法：
      * <pre>{@code
@@ -109,7 +120,7 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurUltra实例
+     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurUltra实例（动态位移模式）
      *
      * <p>示例用法：
      * <pre>{@code
@@ -123,23 +134,53 @@ public class FastBlurUltra extends FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     public FastBlurUltra(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
+        this(encoding, key, keySegment, true, parallelProcessing);
+    }
+    
+    /**
+     * 构造函数，使用指定的编码、密钥、位移值、动态位移选项和平行处理选项初始化FastBlurUltra实例
+     *
+     * @param encoding           字符编码方式
+     * @param key                64位密钥（动态位移）或用于异或运算的密钥（固定位移）
+     * @param shiftParam         密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
+     * @param dynamicShift       是否启用动态位移
+     * @param parallelProcessing 是否启用并行处理
+     */
+    public FastBlurUltra(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing);
-        // 预计算密钥片段，避免在每次加密/解密时重复计算
-        this.keyPart1 = (byte) (key & 0xFF);
-        this.keyPart2 = (byte) ((key >> 8) & 0xFF);
-        this.shiftMask = keySegment & 0xFF;
+        this.dynamicShift = dynamicShift;
+        
+        if (dynamicShift) {
+            // 动态位移模式
+            // 预计算密钥片段，避免在每次加密/解密时重复计算
+            this.keyPart1 = (byte) (key & 0xFF);
+            this.keyPart2 = (byte) ((key >> 8) & 0xFF);
+            this.shiftMask = shiftParam & 0xFF;
+            this.shift = 0; // 固定位移值在动态模式下不使用
+        } else {
+            // 固定位移模式
+            this.keyPart1 = (byte) (key & 0xFF); // 用于异或运算的密钥
+            this.shift = shiftParam & 0x7; // 确保位移值在0-7之间
+            this.keyPart2 = 0; // 动态位移参数在固定模式下不使用
+            this.shiftMask = 0; // 动态位移参数在固定模式下不使用
+        }
 
-        // 预计算查找表
-        this.leftShiftTable = new byte[8][256];
-        this.rightShiftTable = new byte[8][256];
+        // 预计算查找表（仅在动态位移模式下需要）
+        if (dynamicShift) {
+            this.leftShiftTable = new byte[8][256];
+            this.rightShiftTable = new byte[8][256];
 
-        for (int shift = 0; shift < 8; shift++) {
-            for (int b = 0; b < 256; b++) {
-                // 左循环位移
-                leftShiftTable[shift][b] = (byte) (((b << shift) | (b >>> (8 - shift))) & 0xFF);
-                // 右循环位移
-                rightShiftTable[shift][b] = (byte) (((b >>> shift) | (b << (8 - shift))) & 0xFF);
+            for (int shift = 0; shift < 8; shift++) {
+                for (int b = 0; b < 256; b++) {
+                    // 左循环位移
+                    leftShiftTable[shift][b] = (byte) (((b << shift) | (b >>> (8 - shift))) & 0xFF);
+                    // 右循环位移
+                    rightShiftTable[shift][b] = (byte) (((b >>> shift) | (b << (8 - shift))) & 0xFF);
+                }
             }
+        } else {
+            this.leftShiftTable = null;
+            this.rightShiftTable = null;
         }
     }
 
@@ -165,12 +206,17 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * 加密字节数组（动态位移增强混淆）
+     * 加密字节数组（支持固定位移和动态位移增强混淆）
      *
-     * <p>加密过程分为三个步骤：
+     * <p>加密过程分为三个步骤（动态位移）或两个步骤（固定位移）：
+     * 动态位移模式：
      * 1. 使用密钥的第一部分与数据进行异或运算
      * 2. 对结果进行动态循环左移
-     * 3. 使用密钥的第二部分与数据进行异或运算</p>
+     * 3. 使用密钥的第二部分与数据进行异或运算
+     * 
+     * 固定位移模式：
+     * 1. 使用密钥与数据进行异或运算
+     * 2. 对结果进行固定循环左移</p>
      *
      * <p>示例用法：
      * <pre>{@code
@@ -194,29 +240,128 @@ public class FastBlurUltra extends FastBlurBase {
             return encryptParallel(data);
         }
 
-        // 对于小数据(<=256字节)，使用小数据优化方法
-        if (data.length <= 256) {
-            return encryptSmall(data);
-        }
+        if (dynamicShift) {
+            // 动态位移模式
+            // 对于小数据(<=256字节)，使用小数据优化方法
+            if (data.length <= 256) {
+                return encryptSmall(data);
+            }
 
-        // 直接在原数组上操作，避免数组复制开销
+            // 直接在原数组上操作，避免数组复制开销
+            final int len = data.length;
+            for (int i = 0; i < len; i++) {
+                // 将byte转换为unsigned int以用作查找表索引
+                final int b = data[i] & 0xFF;
+
+                // 步骤1：第一段密钥异或
+                final int xored1 = b ^ (keyPart1 & 0xFF);
+
+                // 获取动态位移值
+                final int dynamicShift = getDynamicShift(i);
+
+                // 步骤2：动态循环左移（使用查找表）
+                final int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
+
+                // 步骤3：第二段密钥异或
+                data[i] = (byte) (shifted ^ (keyPart2 & 0xFF));
+            }
+        } else {
+            // 固定位移模式
+            // 对于小数据(<=128字节)，使用展开循环优化
+            if (data.length <= 128) {
+                return encryptUnrolled(data);
+            }
+
+            // 直接在原数组上操作，避免数组复制开销
+            for (int i = 0; i < data.length; i++) {
+                // 步骤1：密钥异或
+                data[i] ^= keyPart1;
+                
+                // 步骤2：固定循环左移
+                if (shift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    int shifted = (unsigned << shift) | (unsigned >>> (8 - shift));
+                    data[i] = (byte) (shifted & 0xFF);
+                }
+            }
+        }
+        return data;
+    }
+    
+    /**
+     * 展开循环的小数据加密方法（固定位移模式）
+     * 专门针对小于等于128字节的数据进行优化
+     *
+     * @param data 原始字节数组
+     * @return 加密后字节数组
+     */
+    private byte[] encryptUnrolled(byte[] data) {
         final int len = data.length;
-        for (int i = 0; i < len; i++) {
-            // 将byte转换为unsigned int以用作查找表索引
-            final int b = data[i] & 0xFF;
-
-            // 步骤1：第一段密钥异或
-            final int xored1 = b ^ (keyPart1 & 0xFF);
-
-            // 获取动态位移值
-            final int dynamicShift = getDynamicShift(i);
-
-            // 步骤2：动态循环左移（使用查找表）
-            final int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
-
-            // 步骤3：第二段密钥异或
-            data[i] = (byte) (shifted ^ (keyPart2 & 0xFF));
+        final byte kp1 = keyPart1;
+        final int sh = shift;
+        
+        // 展开循环以减少分支开销
+        int i = 0;
+        for (; i <= len - 8; i += 8) {
+            // 处理8个字节
+            data[i] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i] & 0xFF;
+                data[i] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+1] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+1] & 0xFF;
+                data[i+1] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+2] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+2] & 0xFF;
+                data[i+2] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+3] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+3] & 0xFF;
+                data[i+3] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+4] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+4] & 0xFF;
+                data[i+4] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+5] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+5] & 0xFF;
+                data[i+5] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+6] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+6] & 0xFF;
+                data[i+6] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+            
+            data[i+7] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i+7] & 0xFF;
+                data[i+7] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
         }
+        
+        // 处理剩余字节
+        for (; i < len; i++) {
+            data[i] ^= kp1;
+            if (sh != 0) {
+                int unsigned = data[i] & 0xFF;
+                data[i] = (byte) (((unsigned << sh) | (unsigned >>> (8 - sh))) & 0xFF);
+            }
+        }
+        
         return data;
     }
 
@@ -319,29 +464,128 @@ public class FastBlurUltra extends FastBlurBase {
             return decryptParallel(encryptedData);
         }
 
-        // 对于小数据(<=256字节)，使用小数据优化方法
-        if (encryptedData.length <= 256) {
-            return decryptSmall(encryptedData);
-        }
+        if (dynamicShift) {
+            // 动态位移模式
+            // 对于小数据(<=256字节)，使用小数据优化方法
+            if (encryptedData.length <= 256) {
+                return decryptSmall(encryptedData);
+            }
 
-        // 直接在原数组上操作，避免数组复制开销
+            // 直接在原数组上操作，避免数组复制开销
+            final int len = encryptedData.length;
+            for (int i = 0; i < len; i++) {
+                // 将byte转换为unsigned int以用作查找表索引
+                final int b = encryptedData[i] & 0xFF;
+
+                // 逆步骤3：第二段密钥异或还原
+                final int xored1 = b ^ (keyPart2 & 0xFF);
+
+                // 获取动态位移值（使用相同的规则）
+                final int dynamicShift = getDynamicShift(i);
+
+                // 逆步骤2：动态循环右移（使用查找表）
+                final int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
+
+                // 逆步骤1：第一段密钥异或还原
+                encryptedData[i] = (byte) (shifted ^ (keyPart1 & 0xFF));
+            }
+        } else {
+            // 固定位移模式
+            // 对于小数据(<=128字节)，使用展开循环优化
+            if (encryptedData.length <= 128) {
+                return decryptUnrolled(encryptedData);
+            }
+
+            // 直接在原数组上操作，避免数组复制开销
+            for (int i = 0; i < encryptedData.length; i++) {
+                // 步骤1：密钥异或
+                encryptedData[i] ^= keyPart1;
+                
+                // 步骤2：固定循环右移
+                if (shift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    int shifted = (unsigned >>> shift) | (unsigned << (8 - shift));
+                    encryptedData[i] = (byte) (shifted & 0xFF);
+                }
+            }
+        }
+        return encryptedData;
+    }
+    
+    /**
+     * 展开循环的小数据解密方法（固定位移模式）
+     * 专门针对小于等于128字节的数据进行优化
+     *
+     * @param encryptedData 加密后的字节数组
+     * @return 原始字节数组
+     */
+    private byte[] decryptUnrolled(byte[] encryptedData) {
         final int len = encryptedData.length;
-        for (int i = 0; i < len; i++) {
-            // 将byte转换为unsigned int以用作查找表索引
-            final int b = encryptedData[i] & 0xFF;
-
-            // 逆步骤3：第二段密钥异或还原
-            final int xored1 = b ^ (keyPart2 & 0xFF);
-
-            // 获取动态位移值（使用相同的规则）
-            final int dynamicShift = getDynamicShift(i);
-
-            // 逆步骤2：动态循环右移（使用查找表）
-            final int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
-
-            // 逆步骤1：第一段密钥异或还原
-            encryptedData[i] = (byte) (shifted ^ (keyPart1 & 0xFF));
+        final byte kp1 = keyPart1;
+        final int sh = shift;
+        
+        // 展开循环以减少分支开销
+        int i = 0;
+        for (; i <= len - 8; i += 8) {
+            // 处理8个字节
+            encryptedData[i] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i] & 0xFF;
+                encryptedData[i] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+1] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+1] & 0xFF;
+                encryptedData[i+1] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+2] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+2] & 0xFF;
+                encryptedData[i+2] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+3] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+3] & 0xFF;
+                encryptedData[i+3] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+4] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+4] & 0xFF;
+                encryptedData[i+4] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+5] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+5] & 0xFF;
+                encryptedData[i+5] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+6] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+6] & 0xFF;
+                encryptedData[i+6] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+            
+            encryptedData[i+7] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i+7] & 0xFF;
+                encryptedData[i+7] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
         }
+        
+        // 处理剩余字节
+        for (; i < len; i++) {
+            encryptedData[i] ^= kp1;
+            if (sh != 0) {
+                int unsigned = encryptedData[i] & 0xFF;
+                encryptedData[i] = (byte) (((unsigned >>> sh) | (unsigned << (8 - sh))) & 0xFF);
+            }
+        }
+        
         return encryptedData;
     }
 

@@ -9,14 +9,14 @@ import java.util.concurrent.RecursiveAction;
 
 /**
  * 简单轻量的混淆算法（简化版）
- * 高性能可逆轻量级加密工具（固定位移增强混淆，不保证安全性）
- * 核心：固定位移+异或位运算，极快、可逆、混淆性优于固定位移
+ * 高性能可逆轻量级加密工具（支持固定位移和动态位移增强混淆，不保证安全性）
+ * 核心：固定位移/动态位移+异或位运算，极快、可逆、混淆性优于固定位移
  * 
- * <p>该类提供了一种简单的数据混淆机制，通过固定位移和异或运算实现可逆的数据变换。
+ * <p>该类提供了一种简单的数据混淆机制，通过固定位移/动态位移和异或运算实现可逆的数据变换。
  * 相比复杂版本进行了算法简化，适用于需要极致性能的轻量级数据保护场景。</p>
  * 
  * <p>简化优化点：
- * 1. 使用固定位移替代动态位移计算
+ * 1. 支持固定位移和动态位移两种模式
  * 2. 减少加密步骤，只进行一次异或和一次位移操作
  * 3. 支持并行处理大数据块
  * </p>
@@ -45,6 +45,26 @@ public class FastBlurSimple extends FastBlurBase {
      * 固定位移值
      */
     private final int shift;
+    
+    /**
+     * 是否启用动态位移
+     */
+    private final boolean dynamicShift;
+    
+    /**
+     * 预计算的密钥片段1（用于动态位移异或运算）
+     */
+    private final byte keyPart1;
+    
+    /**
+     * 预计算的密钥片段2（用于动态位移异或运算）
+     */
+    private final byte keyPart2;
+    
+    /**
+     * 用于动态位移计算的掩码
+     */
+    private final int shiftMask;
     
     /**
      * 是否启用并行处理
@@ -76,11 +96,11 @@ public class FastBlurSimple extends FastBlurBase {
      * @param encoding 字符编码方式
      */
     public FastBlurSimple(Charset encoding) {
-        this(encoding, (byte) 0xAB, 3, false);
+        this(encoding, (byte) 0xAB, 3, false, false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥和位移值初始化FastBlurSimple实例
+     * 构造函数，使用指定的编码、密钥和位移值初始化FastBlurSimple实例（固定位移模式）
      * 
      * <p>示例用法：
      * <pre>{@code
@@ -93,30 +113,71 @@ public class FastBlurSimple extends FastBlurBase {
      * @param shift    固定位移值（0-7之间）
      */
     public FastBlurSimple(Charset encoding, byte key, int shift) {
-        this(encoding, key, shift, false);
+        this(encoding, key, shift, false, false);
+    }
+    
+    /**
+     * 构造函数，使用指定的编码、密钥、位移值和动态位移选项初始化FastBlurSimple实例
+     * 
+     * @param encoding      字符编码方式
+     * @param key           用于异或运算的密钥
+     * @param shift         固定位移值（0-7之间）或密钥分段值（用于动态位移）
+     * @param dynamicShift  是否启用动态位移
+     */
+    public FastBlurSimple(Charset encoding, byte key, int shift, boolean dynamicShift) {
+        this(encoding, key, shift, dynamicShift, false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、位移值和平行处理选项初始化FastBlurSimple实例
+     * 构造函数，使用指定的编码、密钥、位移值、动态位移选项和平行处理选项初始化FastBlurSimple实例
      * 
      * @param encoding          字符编码方式
      * @param key               用于异或运算的密钥
-     * @param shift             固定位移值（0-7之间）
+     * @param shift             固定位移值（0-7之间）或密钥分段值（用于动态位移）
+     * @param dynamicShift      是否启用动态位移
      * @param parallelProcessing 是否启用并行处理
      */
-    public FastBlurSimple(Charset encoding, byte key, int shift, boolean parallelProcessing) {
+    public FastBlurSimple(Charset encoding, byte key, int shift, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding);
-        this.key = key;
-        this.shift = shift & 0x7; // 确保位移值在0-7之间
+        this.dynamicShift = dynamicShift;
         this.parallelProcessing = parallelProcessing;
+        
+        if (dynamicShift) {
+            // 动态位移模式
+            this.keyPart1 = key;
+            this.keyPart2 = (byte) ((key + shift) & 0xFF);
+            this.shiftMask = shift & 0xFF;
+            this.shift = 0; // 固定位移值在动态模式下不使用
+        } else {
+            // 固定位移模式
+            this.key = key;
+            this.shift = shift & 0x7; // 确保位移值在0-7之间
+            this.keyPart1 = 0; // 动态位移参数在固定模式下不使用
+            this.keyPart2 = 0; // 动态位移参数在固定模式下不使用
+            this.shiftMask = 0; // 动态位移参数在固定模式下不使用
+        }
+    }
+    
+    /**
+     * 动态计算位移位数（核心增强点）
+     *
+     * <p>根据字节索引和密钥分段值动态计算位移位数，确保结果在0-7之间。
+     * 这种动态计算增加了算法的复杂度和安全性。</p>
+     *
+     * @param index 字节数组下标
+     * @return 0-7之间的位移数
+     */
+    private int getDynamicShift(int index) {
+        // 规则：下标 + 密钥分段值 取模8，保证位移数0-7
+        return (index + shiftMask) & 0x7; // 使用位运算代替取模运算，提高性能
     }
 
     /**
-     * 简化加密字节数组（固定位移增强混淆）
+     * 简化加密字节数组（支持固定位移和动态位移增强混淆）
      * 
      * <p>简化加密过程只有两个步骤：
      * 1. 使用密钥与数据进行异或运算
-     * 2. 对结果进行固定循环左移</p>
+     * 2. 对结果进行固定循环左移或动态循环左移</p>
      *
      * <p>示例用法：
      * <pre>{@code
@@ -146,15 +207,35 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 直接在原数组上操作，避免数组复制开销
-        for (int i = 0; i < data.length; i++) {
-            // 步骤1：密钥异或
-            data[i] ^= key;
-            
-            // 步骤2：固定循环左移
-            if (shift != 0) {
-                int unsigned = data[i] & 0xFF;
-                int shifted = (unsigned << shift) | (unsigned >>> (8 - shift));
-                data[i] = (byte) (shifted & 0xFF);
+        if (dynamicShift) {
+            // 动态位移模式
+            for (int i = 0; i < data.length; i++) {
+                // 步骤1：第一段密钥异或
+                data[i] ^= keyPart1;
+
+                // 步骤2：动态循环左移
+                int dynamicShift = getDynamicShift(i);
+                if (dynamicShift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    int shifted = (unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift));
+                    data[i] = (byte) (shifted & 0xFF);
+                }
+
+                // 步骤3：第二段密钥异或
+                data[i] ^= keyPart2;
+            }
+        } else {
+            // 固定位移模式
+            for (int i = 0; i < data.length; i++) {
+                // 步骤1：密钥异或
+                data[i] ^= key;
+                
+                // 步骤2：固定循环左移
+                if (shift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    int shifted = (unsigned << shift) | (unsigned >>> (8 - shift));
+                    data[i] = (byte) (shifted & 0xFF);
+                }
             }
         }
         return data;
@@ -170,65 +251,121 @@ public class FastBlurSimple extends FastBlurBase {
     private byte[] encryptUnrolled(byte[] data) {
         final int len = data.length;
         
-        // 展开循环以减少分支开销
-        int i = 0;
-        for (; i <= len - 8; i += 8) {
-            // 处理8个字节
-            data[i] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i] & 0xFF;
-                data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+        if (dynamicShift) {
+            // 动态位移模式
+            final byte kp1 = keyPart1;
+            final byte kp2 = keyPart2;
+            final int mask = shiftMask;
+            
+            // 展开循环以减少分支开销
+            int i = 0;
+            for (; i <= len - 4; i += 4) {
+                // 处理4个字节
+                int dynamicShift0 = (i + mask) & 0x7;
+                data[i] ^= kp1;
+                if (dynamicShift0 != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    data[i] = (byte) (((unsigned << dynamicShift0) | (unsigned >>> (8 - dynamicShift0))) & 0xFF);
+                }
+                data[i] ^= kp2;
+
+                int dynamicShift1 = ((i + 1) + mask) & 0x7;
+                data[i+1] ^= kp1;
+                if (dynamicShift1 != 0) {
+                    int unsigned = data[i+1] & 0xFF;
+                    data[i+1] = (byte) (((unsigned << dynamicShift1) | (unsigned >>> (8 - dynamicShift1))) & 0xFF);
+                }
+                data[i+1] ^= kp2;
+
+                int dynamicShift2 = ((i + 2) + mask) & 0x7;
+                data[i+2] ^= kp1;
+                if (dynamicShift2 != 0) {
+                    int unsigned = data[i+2] & 0xFF;
+                    data[i+2] = (byte) (((unsigned << dynamicShift2) | (unsigned >>> (8 - dynamicShift2))) & 0xFF);
+                }
+                data[i+2] ^= kp2;
+
+                int dynamicShift3 = ((i + 3) + mask) & 0x7;
+                data[i+3] ^= kp1;
+                if (dynamicShift3 != 0) {
+                    int unsigned = data[i+3] & 0xFF;
+                    data[i+3] = (byte) (((unsigned << dynamicShift3) | (unsigned >>> (8 - dynamicShift3))) & 0xFF);
+                }
+                data[i+3] ^= kp2;
+            }
+
+            // 处理剩余字节
+            for (; i < len; i++) {
+                int dynamicShift = (i + mask) & 0x7;
+                data[i] ^= kp1;
+                if (dynamicShift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    data[i] = (byte) (((unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift))) & 0xFF);
+                }
+                data[i] ^= kp2;
+            }
+        } else {
+            // 固定位移模式
+            // 展开循环以减少分支开销
+            int i = 0;
+            for (; i <= len - 8; i += 8) {
+                // 处理8个字节
+                data[i] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+1] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+1] & 0xFF;
+                    data[i+1] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+2] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+2] & 0xFF;
+                    data[i+2] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+3] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+3] & 0xFF;
+                    data[i+3] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+4] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+4] & 0xFF;
+                    data[i+4] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+5] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+5] & 0xFF;
+                    data[i+5] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+6] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+6] & 0xFF;
+                    data[i+6] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
+                
+                data[i+7] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i+7] & 0xFF;
+                    data[i+7] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
             }
             
-            data[i+1] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+1] & 0xFF;
-                data[i+1] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+2] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+2] & 0xFF;
-                data[i+2] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+3] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+3] & 0xFF;
-                data[i+3] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+4] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+4] & 0xFF;
-                data[i+4] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+5] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+5] & 0xFF;
-                data[i+5] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+6] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+6] & 0xFF;
-                data[i+6] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-            
-            data[i+7] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i+7] & 0xFF;
-                data[i+7] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
-            }
-        }
-        
-        // 处理剩余字节
-        for (; i < len; i++) {
-            data[i] ^= key;
-            if (shift != 0) {
-                int unsigned = data[i] & 0xFF;
-                data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            // 处理剩余字节
+            for (; i < len; i++) {
+                data[i] ^= key;
+                if (shift != 0) {
+                    int unsigned = data[i] & 0xFF;
+                    data[i] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+                }
             }
         }
         
@@ -236,10 +373,10 @@ public class FastBlurSimple extends FastBlurBase {
     }
 
     /**
-     * 简化解密字节数组（加密的逆操作，固定位移还原）
+     * 简化解密字节数组（加密的逆操作，支持固定位移和动态位移还原）
      * 
      * <p>简化解密是加密的逆向操作：
-     * 1. 对数据进行固定循环右移
+     * 1. 对数据进行固定循环右移或动态循环右移
      * 2. 使用密钥与数据进行异或运算</p>
      *
      * <p>示例用法：
@@ -270,16 +407,36 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 直接在原数组上操作，避免数组复制开销
-        for (int i = 0; i < encryptedData.length; i++) {
-            // 逆步骤2：固定循环右移
-            if (shift != 0) {
-                int unsigned = encryptedData[i] & 0xFF;
-                int shifted = (unsigned >>> shift) | (unsigned << (8 - shift));
-                encryptedData[i] = (byte) (shifted & 0xFF);
+        if (dynamicShift) {
+            // 动态位移模式
+            for (int i = 0; i < encryptedData.length; i++) {
+                // 逆步骤3：第二段密钥异或还原
+                encryptedData[i] ^= keyPart2;
+
+                // 逆步骤2：动态循环右移
+                int dynamicShift = getDynamicShift(i);
+                if (dynamicShift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    int shifted = (unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift));
+                    encryptedData[i] = (byte) (shifted & 0xFF);
+                }
+
+                // 逆步骤1：第一段密钥异或还原
+                encryptedData[i] ^= keyPart1;
             }
-            
-            // 逆步骤1：密钥异或
-            encryptedData[i] ^= key;
+        } else {
+            // 固定位移模式
+            for (int i = 0; i < encryptedData.length; i++) {
+                // 逆步骤2：固定循环右移
+                if (shift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    int shifted = (unsigned >>> shift) | (unsigned << (8 - shift));
+                    encryptedData[i] = (byte) (shifted & 0xFF);
+                }
+                
+                // 逆步骤1：密钥异或
+                encryptedData[i] ^= key;
+            }
         }
         return encryptedData;
     }
@@ -294,66 +451,122 @@ public class FastBlurSimple extends FastBlurBase {
     private byte[] decryptUnrolled(byte[] encryptedData) {
         final int len = encryptedData.length;
         
-        // 展开循环以减少分支开销
-        int i = 0;
-        for (; i <= len - 8; i += 8) {
-            // 处理8个字节
-            if (shift != 0) {
-                int unsigned = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i] ^= key;
+        if (dynamicShift) {
+            // 动态位移模式
+            final byte kp1 = keyPart1;
+            final byte kp2 = keyPart2;
+            final int mask = shiftMask;
             
-            if (shift != 0) {
-                int unsigned = encryptedData[i+1] & 0xFF;
-                encryptedData[i+1] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            // 展开循环以减少分支开销
+            int i = 0;
+            for (; i <= len - 4; i += 4) {
+                // 处理4个字节（逆序执行加密的逆操作）
+                int dynamicShift0 = (i + mask) & 0x7;
+                encryptedData[i] ^= kp2;
+                if (dynamicShift0 != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    encryptedData[i] = (byte) (((unsigned >>> dynamicShift0) | (unsigned << (8 - dynamicShift0))) & 0xFF);
+                }
+                encryptedData[i] ^= kp1;
+
+                int dynamicShift1 = ((i + 1) + mask) & 0x7;
+                encryptedData[i+1] ^= kp2;
+                if (dynamicShift1 != 0) {
+                    int unsigned = encryptedData[i+1] & 0xFF;
+                    encryptedData[i+1] = (byte) (((unsigned >>> dynamicShift1) | (unsigned << (8 - dynamicShift1))) & 0xFF);
+                }
+                encryptedData[i+1] ^= kp1;
+
+                int dynamicShift2 = ((i + 2) + mask) & 0x7;
+                encryptedData[i+2] ^= kp2;
+                if (dynamicShift2 != 0) {
+                    int unsigned = encryptedData[i+2] & 0xFF;
+                    encryptedData[i+2] = (byte) (((unsigned >>> dynamicShift2) | (unsigned << (8 - dynamicShift2))) & 0xFF);
+                }
+                encryptedData[i+2] ^= kp1;
+
+                int dynamicShift3 = ((i + 3) + mask) & 0x7;
+                encryptedData[i+3] ^= kp2;
+                if (dynamicShift3 != 0) {
+                    int unsigned = encryptedData[i+3] & 0xFF;
+                    encryptedData[i+3] = (byte) (((unsigned >>> dynamicShift3) | (unsigned << (8 - dynamicShift3))) & 0xFF);
+                }
+                encryptedData[i+3] ^= kp1;
             }
-            encryptedData[i+1] ^= key;
+
+            // 处理剩余字节
+            for (; i < len; i++) {
+                int dynamicShift = (i + mask) & 0x7;
+                encryptedData[i] ^= kp2;
+                if (dynamicShift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    encryptedData[i] = (byte) (((unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift))) & 0xFF);
+                }
+                encryptedData[i] ^= kp1;
+            }
+        } else {
+            // 固定位移模式
+            // 展开循环以减少分支开销
+            int i = 0;
+            for (; i <= len - 8; i += 8) {
+                // 处理8个字节
+                if (shift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+1] & 0xFF;
+                    encryptedData[i+1] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+1] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+2] & 0xFF;
+                    encryptedData[i+2] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+2] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+3] & 0xFF;
+                    encryptedData[i+3] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+3] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+4] & 0xFF;
+                    encryptedData[i+4] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+4] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+5] & 0xFF;
+                    encryptedData[i+5] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+5] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+6] & 0xFF;
+                    encryptedData[i+6] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+6] ^= key;
+                
+                if (shift != 0) {
+                    int unsigned = encryptedData[i+7] & 0xFF;
+                    encryptedData[i+7] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i+7] ^= key;
+            }
             
-            if (shift != 0) {
-                int unsigned = encryptedData[i+2] & 0xFF;
-                encryptedData[i+2] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            // 处理剩余字节
+            for (; i < len; i++) {
+                if (shift != 0) {
+                    int unsigned = encryptedData[i] & 0xFF;
+                    encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+                }
+                encryptedData[i] ^= key;
             }
-            encryptedData[i+2] ^= key;
-            
-            if (shift != 0) {
-                int unsigned = encryptedData[i+3] & 0xFF;
-                encryptedData[i+3] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i+3] ^= key;
-            
-            if (shift != 0) {
-                int unsigned = encryptedData[i+4] & 0xFF;
-                encryptedData[i+4] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i+4] ^= key;
-            
-            if (shift != 0) {
-                int unsigned = encryptedData[i+5] & 0xFF;
-                encryptedData[i+5] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i+5] ^= key;
-            
-            if (shift != 0) {
-                int unsigned = encryptedData[i+6] & 0xFF;
-                encryptedData[i+6] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i+6] ^= key;
-            
-            if (shift != 0) {
-                int unsigned = encryptedData[i+7] & 0xFF;
-                encryptedData[i+7] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i+7] ^= key;
-        }
-        
-        // 处理剩余字节
-        for (; i < len; i++) {
-            if (shift != 0) {
-                int unsigned = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
-            }
-            encryptedData[i] ^= key;
         }
         
         return encryptedData;

@@ -6,7 +6,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * 简单轻量的混淆算法（自适应优化版）
- * 高性能可逆轻量级加密工具（动态位移增强混淆，不保证安全性）
+ * 高性能可逆轻量级加密工具（支持固定位移和动态位移增强混淆，不保证安全性）
  * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
  *
  * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
@@ -47,6 +47,11 @@ public class FastBlurAdaptive extends FastBlurBase {
      * 优化版本实例（用于大数据处理）
      */
     private final cn.hehouhui.fastblur.FastBlurOptimized optimizedVersion;
+    
+    /**
+     * 是否启用动态位移
+     */
+    private final boolean dynamicShift;
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
@@ -73,11 +78,11 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param encoding 字符编码方式
      */
     public FastBlurAdaptive(Charset encoding) {
-        this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF));
+        this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF), false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurAdaptive实例
+     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurAdaptive实例（动态位移模式）
      *
      * <p>示例用法：
      * <pre>{@code
@@ -90,11 +95,23 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param keySegment 密钥分段值，用于动态位移计算
      */
     public FastBlurAdaptive(Charset encoding, long key, byte keySegment) {
-        this(encoding, key, keySegment, false);
+        this(encoding, key, keySegment, true);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurAdaptive实例
+     * 构造函数，使用指定的编码、密钥、位移参数和动态位移选项初始化FastBlurAdaptive实例
+     *
+     * @param encoding     字符编码方式
+     * @param key          64位密钥（动态位移）或用于异或运算的密钥（固定位移）
+     * @param shiftParam   密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
+     * @param dynamicShift 是否启用动态位移
+     */
+    public FastBlurAdaptive(Charset encoding, long key, int shiftParam, boolean dynamicShift) {
+        this(encoding, key, shiftParam, dynamicShift, false);
+    }
+
+    /**
+     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurAdaptive实例（动态位移模式）
      *
      * <p>示例用法：
      * <pre>{@code
@@ -108,11 +125,25 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     public FastBlurAdaptive(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
+        this(encoding, key, keySegment, true, parallelProcessing);
+    }
+
+    /**
+     * 构造函数，使用指定的编码、密钥、位移参数、动态位移选项和平行处理选项初始化FastBlurAdaptive实例
+     *
+     * @param encoding           字符编码方式
+     * @param key                64位密钥（动态位移）或用于异或运算的密钥（固定位移）
+     * @param shiftParam         密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
+     * @param dynamicShift       是否启用动态位移
+     * @param parallelProcessing 是否启用并行处理
+     */
+    public FastBlurAdaptive(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing);
+        this.dynamicShift = dynamicShift;
         // 初始化各个版本的实例
-        this.fastVersion = new cn.hehouhui.fastblur.FastBlurUltra(encoding, key, keySegment, parallelProcessing);
-        this.vectorizedVersion = new cn.hehouhui.fastblur.FastBlurVectorized(encoding, key, keySegment, parallelProcessing);
-        this.optimizedVersion = new cn.hehouhui.fastblur.FastBlurOptimized(encoding, key, keySegment, parallelProcessing);
+        this.fastVersion = new cn.hehouhui.fastblur.FastBlurUltra(encoding, key, shiftParam, dynamicShift, parallelProcessing);
+        this.vectorizedVersion = new cn.hehouhui.fastblur.FastBlurVectorized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
+        this.optimizedVersion = new cn.hehouhui.fastblur.FastBlurOptimized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
     }
 
     /**
