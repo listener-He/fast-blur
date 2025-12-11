@@ -1,35 +1,72 @@
 package cn.hehouhui.fastblur;
 
 /**
- * FastBlur策略枚举
- * 定义了不同的性能优化策略
+ * Performance optimization strategy enumeration for FastBlur algorithms.
+ * <br/>
+ * This enum defines different performance optimization strategies that can be used 
+ * with FastBlur implementations. Each strategy represents a trade-off between 
+ * memory usage, processing speed, and other performance characteristics.
+ *
+ * <p>Design Philosophy:</p>
+ * <ul>
+ *   <li>{@link #MEMORY_FIRST} - Balanced approach optimizing for memory efficiency</li>
+ *   <li>{@link #SPEED_FIRST} - Maximum speed optimization at the cost of higher memory usage</li>
+ *   <li>{@link #VECTOR} - Vectorized processing for bulk data operations</li>
+ *   <li>{@link #ADAPTIVE} - Automatically selects the best strategy based on data size</li>
+ * </ul>
  *
  * @author HeHui
  * @since 1.0
+ * @see FastBlurBase
+ * @see FastBlurBase.FastBlurBuilder
  */
 public enum FastBlurStrategy {
 
     /**
-     * 内存优先策略
-     * 在内存使用和处理速度之间取得平衡，适合大多数应用场景
+     * Memory-first strategy.
+     * <br/>
+     * Balances memory usage and processing speed, suitable for most application scenarios.
+     * This strategy aims to minimize memory footprint while maintaining reasonable 
+     * processing performance.
+     *
+     * <p>Use case: General purpose applications where memory conservation is important 
+     * but high throughput is not critical.</p>
      */
     MEMORY_FIRST,
 
     /**
-     * 速度优先策略
-     * 使用查找表等技术最大化处理速度，但会消耗更多内存
+     * Speed-first strategy.
+     * <br/>
+     * Maximizes processing speed using techniques like lookup tables, but consumes 
+     * more memory. This strategy pre-calculates values to reduce computation time.
+     *
+     * <p>Use case: Applications requiring maximum processing speed where memory 
+     * usage is not a primary concern.</p>
      */
     SPEED_FIRST,
 
     /**
-     * 向量处理策略
-     * 使用向量化处理技术优化大批量数据的处理
+     * Vector processing strategy.
+     * <br/>
+     * Uses vectorized processing techniques to optimize handling of large volumes 
+     * of data. This strategy processes data in batches to improve throughput.
+     *
+     * <p>Use case: Processing large datasets where batch operations can significantly 
+     * improve performance.</p>
      */
     VECTOR,
 
     /**
-     * 自适应策略
-     * 根据数据大小自动选择最适合的处理策略
+     * Adaptive strategy.
+     * <br/>
+     * Automatically selects the most suitable processing strategy based on data size.
+     * It dynamically chooses between different algorithms depending on the amount 
+     * of data being processed.
+     *
+     * <p>Use case: Applications handling varying data sizes where a single strategy 
+     * may not be optimal for all cases.</p>
+     *
+     * @see FastBlurAdaptive
      */
     ADAPTIVE
 }

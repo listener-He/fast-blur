@@ -5,20 +5,24 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 /**
- * 简单轻量的混淆算法（自适应优化版）
- * 高性能可逆轻量级加密工具（支持固定位移和动态位移增强混淆，不保证安全性）
- * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
+ * Adaptive Fast Blur Encryption Utility
  *
- * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
- * 根据数据大小自动选择最优的处理策略，适用于各种场景下的高性能数据保护。</p>
+ * <p>A high-performance, lightweight encryption utility that automatically selects the optimal 
+ * processing strategy based on data size. It uses dynamic bit shifting and XOR operations to 
+ * achieve reversible data transformation. This implementation adaptively chooses between different 
+ * optimized versions depending on the data size:</p>
  *
- * <p>自适应优化策略：
- * 1. 小数据（≤256字节）：使用查找表优化版本
- * 2. 中等数据（256-2048字节）：使用向量化优化版本
- * 3. 大数据（>2048字节）：使用原始优化版本
- * </p>
+ * <ul>
+ *   <li>Small Data (≤ 256 bytes): Uses ultra-fast lookup table optimized version</li>
+ *   <li>Medium Data (256-4096 bytes): Uses vectorized optimized version</li>
+ *   <li>Large Data (> 4096 bytes): Uses general optimized version</li>
+ * </ul>
  *
- * <p>示例用法：
+ * <p>This class is designed for performance-critical applications where data obfuscation is 
+ * required but cryptographic security is not a primary concern. The underlying algorithm 
+ * combines dynamic bit shifts with XOR operations to achieve fast, reversible transformations.</p>
+ *
+ * <p>Example usage:
  * <pre>{@code
  * FastBlurAdaptive encryptor = new FastBlurAdaptive();
  * String original = "Hello World";
@@ -30,107 +34,150 @@ import java.nio.charset.StandardCharsets;
  *
  * @author HeHui
  * @since 1.0
+ * @see FastBlurUltra Ultra-fast implementation for small data
+ * @see FastBlurVectorized Vectorized implementation for medium data
+ * @see FastBlurOptimized General optimized implementation for large data
  */
 public class FastBlurAdaptive extends FastBlurBase {
 
     /**
-     * 极速版本实例（用于小数据处理）
+     * Ultra-fast implementation instance for small data processing.
+     * <p>Used when data size is ≤ 256 bytes for maximum performance.</p>
      */
     private final FastBlurUltra fastVersion;
 
     /**
-     * 向量化版本实例（用于中等数据处理）
+     * Vectorized implementation instance for medium data processing.
+     * <p>Used when data size is between 257-4096 bytes to leverage vectorization optimizations.</p>
      */
     private final FastBlurVectorized vectorizedVersion;
 
     /**
-     * 优化版本实例（用于大数据处理）
+     * General optimized implementation instance for large data processing.
+     * <p>Used when data size is > 4096 bytes for balanced performance and memory usage.</p>
      */
     private final FastBlurOptimized optimizedVersion;
 
     /**
-     * 默认构造函数，使用UTF-8字符集编码
+     * Constructs a FastBlurAdaptive instance with UTF-8 character encoding.
      *
-     * <p>示例用法：
+     * <p>This constructor initializes the adaptive blur engine with default parameters:
+     * <ul>
+     *   <li>Character encoding: UTF-8</li>
+     *   <li>Default key: 0x5A7B9C1D3E8F0A2BL</li>
+     *   <li>Dynamic shift mode enabled</li>
+     *   <li>Parallel processing disabled</li>
+     * </ul>
+     * </p>
+     *
+     * <p>Example usage:
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive();
      * }</pre>
      * </p>
+     *
+     * @see #FastBlurAdaptive(Charset)
      */
     public FastBlurAdaptive() {
         this(StandardCharsets.UTF_8);
     }
 
     /**
-     * 构造函数，使用指定的编码方式初始化FastBlurAdaptive实例
+     * Constructs a FastBlurAdaptive instance with the specified character encoding.
      *
-     * <p>示例用法：
+     * <p>This constructor initializes the adaptive blur engine with the given character encoding
+     * and default key parameters. Dynamic shift mode is enabled with parallel processing disabled.</p>
+     *
+     * <p>Example usage:
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8);
      * }</pre>
      * </p>
      *
-     * @param encoding 字符编码方式
+     * @param encoding Character encoding to use for string operations
+     * @see #FastBlurAdaptive(Charset, long, byte)
      */
     public FastBlurAdaptive(Charset encoding) {
         this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF), false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurAdaptive实例（动态位移模式）
+     * Constructs a FastBlurAdaptive instance with specified encoding, key, and key segment (dynamic shift mode).
      *
-     * <p>示例用法：
+     * <p>This constructor initializes the adaptive blur engine with custom parameters in dynamic shift mode.
+     * Parallel processing is disabled by default.</p>
+     *
+     * <p>Example usage:
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB);
      * }</pre>
      * </p>
      *
-     * @param encoding   字符编码方式
-     * @param key        64位密钥
-     * @param keySegment 密钥分段值，用于动态位移计算
+     * @param encoding   Character encoding to use for string operations
+     * @param key        64-bit encryption key used for dynamic shifting calculations
+     * @param keySegment Key segment value used for dynamic shift computation
+     * @see #FastBlurAdaptive(Charset, long, int, boolean)
      */
     public FastBlurAdaptive(Charset encoding, long key, byte keySegment) {
         this(encoding, key, keySegment, true);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、位移参数和动态位移选项初始化FastBlurAdaptive实例
+     * Constructs a FastBlurAdaptive instance with specified encoding, key, shift parameters, and dynamic shift option.
      *
-     * @param encoding     字符编码方式
-     * @param key          64位密钥（动态位移）或用于异或运算的密钥（固定位移）
-     * @param shiftParam   密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
-     * @param dynamicShift 是否启用动态位移
+     * <p>This constructor allows fine-grained control over the encryption parameters. Parallel processing
+     * is disabled by default.</p>
+     *
+     * @param encoding     Character encoding to use for string operations
+     * @param key          64-bit encryption key (for dynamic shift) or XOR key (for fixed shift)
+     * @param shiftParam   Key segment value (for dynamic shift) or fixed shift value (0-7 for fixed shift)
+     * @param dynamicShift Whether to enable dynamic shift mode
+     * @see #FastBlurAdaptive(Charset, long, int, boolean, boolean)
      */
     public FastBlurAdaptive(Charset encoding, long key, int shiftParam, boolean dynamicShift) {
         this(encoding, key, shiftParam, dynamicShift, false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurAdaptive实例（动态位移模式）
+     * Constructs a FastBlurAdaptive instance with specified encoding, key, key segment, and parallel processing option (dynamic shift mode).
      *
-     * <p>示例用法：
+     * <p>This constructor initializes the adaptive blur engine with custom parameters in dynamic shift mode
+     * and enables or disables parallel processing based on the provided flag.</p>
+     *
+     * <p>Example usage:
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB, true);
      * }</pre>
      * </p>
      *
-     * @param encoding           字符编码方式
-     * @param key                64位密钥
-     * @param keySegment         密钥分段值，用于动态位移计算
-     * @param parallelProcessing 是否启用并行处理
+     * @param encoding           Character encoding to use for string operations
+     * @param key                64-bit encryption key used for dynamic shifting calculations
+     * @param keySegment         Key segment value used for dynamic shift computation
+     * @param parallelProcessing Whether to enable parallel processing
+     * @see #FastBlurAdaptive(Charset, long, int, boolean, boolean)
      */
     public FastBlurAdaptive(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
         this(encoding, key, keySegment, true, parallelProcessing);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、位移参数、动态位移选项和平行处理选项初始化FastBlurAdaptive实例
+     * Constructs a FastBlurAdaptive instance with full customization of all parameters.
      *
-     * @param encoding           字符编码方式
-     * @param key                64位密钥（动态位移）或用于异或运算的密钥（固定位移）
-     * @param shiftParam         密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
-     * @param dynamicShift       是否启用动态位移
-     * @param parallelProcessing 是否启用并行处理
+     * <p>This is the most flexible constructor that allows complete control over all encryption parameters,
+     * including encoding, key, shift parameters, dynamic shift mode, and parallel processing options.</p>
+     *
+     * <p>The constructor initializes instances of all three specialized versions:
+     * {@link FastBlurUltra}, {@link FastBlurVectorized}, and {@link FastBlurOptimized}
+     * to enable adaptive processing based on data size.</p>
+     *
+     * @param encoding           Character encoding to use for string operations
+     * @param key                64-bit encryption key (for dynamic shift) or XOR key (for fixed shift)
+     * @param shiftParam         Key segment value (for dynamic shift) or fixed shift value (0-7 for fixed shift)
+     * @param dynamicShift       Whether to enable dynamic shift mode
+     * @param parallelProcessing Whether to enable parallel processing
+     * @see FastBlurUltra
+     * @see FastBlurVectorized
+     * @see FastBlurOptimized
      */
     public FastBlurAdaptive(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing, dynamicShift,
@@ -146,12 +193,22 @@ public class FastBlurAdaptive extends FastBlurBase {
     }
 
     /**
-     * 自适应加密字节数组
-     * 根据数据大小选择最优的加密策略
+     * Encrypts a byte array using adaptive strategy selection based on data size.
      *
-     * @param data 原始字节数组
+     * <p>This method automatically selects the optimal encryption strategy:
+     * <ul>
+     *   <li>Data ≤ 256 bytes: Uses {@link FastBlurUltra} for maximum performance</li>
+     *   <li>Data 257-4096 bytes: Uses {@link FastBlurVectorized} for vectorization benefits</li>
+     *   <li>Data > 4096 bytes: Uses {@link FastBlurOptimized} for balanced performance</li>
+     * </ul>
+     * </p>
      *
-     * @return 加密后字节数组
+     * @param data Raw byte array to encrypt
+     *
+     * @return Encrypted byte array
+     * @see FastBlurUltra#encrypt(byte[])
+     * @see FastBlurVectorized#encrypt(byte[])
+     * @see FastBlurOptimized#encrypt(byte[])
      */
     @Override
     public byte[] encrypt(byte[] data) {
@@ -173,12 +230,22 @@ public class FastBlurAdaptive extends FastBlurBase {
     }
 
     /**
-     * 自适应解密字节数组
-     * 根据数据大小选择最优的解密策略
+     * Decrypts a byte array using adaptive strategy selection based on data size.
      *
-     * @param encryptedData 加密后的字节数组
+     * <p>This method automatically selects the optimal decryption strategy:
+     * <ul>
+     *   <li>Data ≤ 256 bytes: Uses {@link FastBlurUltra} for maximum performance</li>
+     *   <li>Data 257-4096 bytes: Uses {@link FastBlurVectorized} for vectorization benefits</li>
+     *   <li>Data > 4096 bytes: Uses {@link FastBlurOptimized} for balanced performance</li>
+     * </ul>
+     * </p>
      *
-     * @return 原始字节数组
+     * @param encryptedData Encrypted byte array to decrypt
+     *
+     * @return Decrypted (original) byte array
+     * @see FastBlurUltra#decrypt(byte[])
+     * @see FastBlurVectorized#decrypt(byte[])
+     * @see FastBlurOptimized#decrypt(byte[])
      */
     @Override
     public byte[] decrypt(byte[] encryptedData) {
@@ -200,14 +267,17 @@ public class FastBlurAdaptive extends FastBlurBase {
     }
 
     /**
-     * Zero-copy加密ByteBuffer
-     * 直接在ByteBuffer上进行操作，避免额外的内存分配
+     * Performs zero-copy encryption on a ByteBuffer.
      *
-     * @param buffer 包含原始数据的直接缓冲区
-     * @param offset 数据偏移量
-     * @param length 数据长度
+     * <p>Directly operates on the ByteBuffer to avoid additional memory allocation.
+     * This implementation falls back to the regular encryption method.</p>
      *
-     * @return 执行结果，true表示成功，false表示失败
+     * @param buffer ByteBuffer containing the raw data
+     * @param offset Data offset within the buffer
+     * @param length Length of data to process
+     *
+     * @return Execution result, true indicates success, false indicates failure
+     * @see #encrypt(ByteBuffer, int, int)
      */
     @Override
     public boolean encryptZeroCopy(ByteBuffer buffer, int offset, int length) {
@@ -216,14 +286,17 @@ public class FastBlurAdaptive extends FastBlurBase {
     }
 
     /**
-     * Zero-copy解密ByteBuffer
-     * 直接在ByteBuffer上进行操作，避免额外的内存分配
+     * Performs zero-copy decryption on a ByteBuffer.
      *
-     * @param buffer 包含加密数据的直接缓冲区
-     * @param offset 数据偏移量
-     * @param length 数据长度
+     * <p>Directly operates on the ByteBuffer to avoid additional memory allocation.
+     * This implementation falls back to the regular decryption method.</p>
      *
-     * @return 执行结果，true表示成功，false表示失败
+     * @param buffer ByteBuffer containing the encrypted data
+     * @param offset Data offset within the buffer
+     * @param length Length of data to process
+     *
+     * @return Execution result, true indicates success, false indicates failure
+     * @see #decrypt(ByteBuffer, int, int)
      */
     @Override
     public boolean decryptZeroCopy(ByteBuffer buffer, int offset, int length) {

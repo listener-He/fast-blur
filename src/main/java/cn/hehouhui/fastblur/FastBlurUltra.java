@@ -8,23 +8,34 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
- * 简单轻量的混淆算法（极速版）
- * 高性能可逆轻量级加密工具（支持固定位移和动态位移增强混淆，不保证安全性）
- * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
+ * Simple lightweight obfuscation algorithm (ultra version).
+ * <br/>
+ * High-performance reversible lightweight encryption tool (supports fixed shift and 
+ * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift + 
+ * XOR bitwise operations, extremely fast, reversible, obfuscation superior to fixed shift.
  *
- * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
- * 相比普通版本进行了极致性能优化，适用于需要极致性能的轻量级数据保护场景。</p>
+ * <p>This class provides a simple data obfuscation mechanism that implements 
+ * reversible data transformation through dynamic shift and XOR operations.
+ * Compared to ordinary versions, extreme performance optimizations have been made, 
+ * suitable for lightweight data protection scenarios requiring extreme performance.</p>
  *
- * <p>极致优化点：
- * 1. 使用查找表完全避免位运算
- * 2. 展开小规模循环减少分支预测失败
- * 3. 预计算所有可能的位移结果
- * 4. 避免所有不必要的对象创建
- * 5. 利用CPU缓存友好的访问模式
- * 6. 支持固定位移和动态位移两种模式
+ * <p>Extreme optimizations:
+ * 1. Use lookup tables to completely avoid bitwise operations
+ * 2. Unroll small loops to reduce branch prediction failures
+ * 3. Pre-compute all possible shift results
+ * 4. Avoid all unnecessary object creation
+ * 5. Utilize CPU cache-friendly access patterns
+ * 6. Support both fixed shift and dynamic shift modes
  * </p>
  *
- * <p>示例用法：
+ * <p>Design Philosophy:
+ * The ultra version represents the pinnacle of performance optimization for the 
+ * FastBlur algorithm. It trades memory for speed by pre-computing lookup tables, 
+ * making it ideal for scenarios where maximum throughput is required regardless 
+ * of memory constraints.
+ * </p>
+ *
+ * <p>Usage example:
  * <pre>{@code
  * FastBlurUltra encryptor = new FastBlurUltra();
  * String original = "Hello World";
@@ -36,90 +47,153 @@ import java.util.concurrent.RecursiveAction;
  *
  * @author HeHui
  * @since 1.0
+ * @see FastBlurBase
+ * @see FastBlurStrategy#SPEED_FIRST
  */
 public class FastBlurUltra extends FastBlurBase {
 
     /**
-     * 左循环位移查找表
+     * Left circular shift lookup table.
+     * <br/>
+     * Pre-computed lookup table for left circular shifts. Indexed by shift amount 
+     * (0-7) and byte value (0-255). This table eliminates the need for runtime 
+     * bitwise operations, trading memory for speed.
+     *
+     * <p>Structure:
+     * - First dimension: shift amount (0-7)
+     * - Second dimension: byte value (0-255)
+     * - Value: result of left circular shift
+     * </p>
+     *
+     * @see #rightShiftTable
+     * @see FastBlurUtils#rotateLeft(int, int)
      */
     private final byte[][] leftShiftTable;
 
     /**
-     * 右循环位移查找表
+     * Right circular shift lookup table.
+     * <br/>
+     * Pre-computed lookup table for right circular shifts. Indexed by shift amount 
+     * (0-7) and byte value (0-255). This table eliminates the need for runtime 
+     * bitwise operations, trading memory for speed.
+     *
+     * <p>Structure:
+     * - First dimension: shift amount (0-7)
+     * - Second dimension: byte value (0-255)
+     * - Value: result of right circular shift
+     * </p>
+     *
+     * @see #leftShiftTable
+     * @see FastBlurUtils#rotateRight(int, int)
      */
     private final byte[][] rightShiftTable;
 
     /**
-     * 默认构造函数，使用UTF-8字符集编码
+     * Default constructor using UTF-8 character set encoding.
+     * <br/>
+     * Initializes a FastBlurUltra instance with UTF-8 encoding and default 
+     * configuration values. Dynamic shifting is enabled and parallel processing 
+     * is disabled.
      *
-     * <p>示例用法：
+     * <p>Usage example:
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra();
      * }</pre>
      * </p>
+     *
+     * @see StandardCharsets#UTF_8
      */
     public FastBlurUltra() {
         this(StandardCharsets.UTF_8);
     }
 
     /**
-     * 构造函数，使用指定的编码方式初始化FastBlurUltra实例
+     * Constructor initializing a FastBlurUltra instance with the specified encoding.
+     * <br/>
+     * Initializes a FastBlurUltra instance with the given character encoding and 
+     * default key and shift values. Dynamic shifting is enabled and parallel processing 
+     * is disabled.
      *
-     * <p>示例用法：
+     * <p>Usage example:
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8);
      * }</pre>
      * </p>
      *
-     * @param encoding 字符编码方式
+     * @param encoding character encoding method
+     * @see Charset
      */
     public FastBlurUltra(Charset encoding) {
         this(encoding, 0x5A7B9C1D3E8F0A2BL, (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF), false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurUltra实例（动态位移模式）
+     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * key, and key segment (dynamic shift mode).
+     * <br/>
+     * Initializes a FastBlurUltra instance in dynamic shift mode with the given 
+     * parameters. Parallel processing is disabled.
      *
-     * <p>示例用法：
+     * <p>Usage example:
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB);
      * }</pre>
      * </p>
      *
-     * @param encoding    字符编码方式
-     * @param key         64位密钥
-     * @param keySegment  密钥分段值，用于动态位移计算
+     * @param encoding    character encoding method
+     * @param key         64-bit key
+     * @param keySegment  key segment value for dynamic shift calculation
+     * @see Charset
      */
     public FastBlurUltra(Charset encoding, long key, byte keySegment) {
         this(encoding, key, keySegment, false);
     }
 
     /**
-     * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurUltra实例（动态位移模式）
+     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * key, key segment, and parallel processing option (dynamic shift mode).
+     * <br/>
+     * Initializes a FastBlurUltra instance in dynamic shift mode with the given 
+     * parameters. Parallel processing can be enabled.
      *
-     * <p>示例用法：
+     * <p>Usage example:
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB, true);
      * }</pre>
      * </p>
      *
-     * @param encoding           字符编码方式
-     * @param key                64位密钥
-     * @param keySegment         密钥分段值，用于动态位移计算
-     * @param parallelProcessing 是否启用并行处理
+     * @param encoding           character encoding method
+     * @param key                64-bit key
+     * @param keySegment         key segment value for dynamic shift calculation
+     * @param parallelProcessing whether to enable parallel processing
+     * @see Charset
+     * @see #parallelProcessing
      */
     public FastBlurUltra(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
         this(encoding, key, keySegment, true, parallelProcessing);
     }
     
     /**
-     * 构造函数，使用指定的编码、密钥、位移值、动态位移选项和平行处理选项初始化FastBlurUltra实例
+     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * key, shift parameter, dynamic shift option, and parallel processing option.
+     * <br/>
+     * Fully configurable constructor for FastBlurUltra instances.
      *
-     * @param encoding           字符编码方式
-     * @param key                64位密钥（动态位移）或用于异或运算的密钥（固定位移）
-     * @param shiftParam         密钥分段值（动态位移）或固定位移值（固定位移，0-7之间）
-     * @param dynamicShift       是否启用动态位移
-     * @param parallelProcessing 是否启用并行处理
+     * <p>Lookup Table Initialization:
+     * In dynamic shift mode, pre-computes lookup tables for all possible shift 
+     * operations to eliminate runtime bitwise computations.
+     * </p>
+     *
+     * @param encoding           character encoding method
+     * @param key                64-bit key (dynamic shift) or key for XOR operations (fixed shift)
+     * @param shiftParam         key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
+     * @param dynamicShift       whether to enable dynamic shift
+     * @param parallelProcessing whether to enable parallel processing
+     * @see Charset
+     * @see #dynamicShift
+     * @see #parallelProcessing
+     * @see #leftShiftTable
+     * @see #rightShiftTable
      */
     public FastBlurUltra(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing, dynamicShift,
@@ -148,28 +222,53 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * 加密字节数组（支持固定位移和动态位移增强混淆）
-     *
-     * <p>加密过程分为三个步骤（动态位移）或两个步骤（固定位移）：
-     * 动态位移模式：
-     * 1. 使用密钥的第一部分与数据进行异或运算
-     * 2. 对结果进行动态循环左移
-     * 3. 使用密钥的第二部分与数据进行异或运算
+     * Encrypts a byte array (supports fixed shift and dynamic shift enhanced obfuscation).
+     * <br/>
+     * The encryption process consists of three steps (dynamic shift) or two steps (fixed shift):
+     * Dynamic shift mode:
+     * 1. XOR the data with the first part of the key
+     * 2. Perform dynamic circular left shift on the result
+     * 3. XOR the result with the second part of the key
      * 
-     * 固定位移模式：
-     * 1. 使用密钥与数据进行异或运算
-     * 2. 对结果进行固定循环左移</p>
+     * Fixed shift mode:
+     * 1. XOR the data with the key
+     * 2. Perform fixed circular left shift on the result
      *
-     * <p>示例用法：
+     * <p>Algorithm Details:
+     * In dynamic shift mode:
+     * 1. XOR data with first key fragment ({@link #keyPart1})
+     * 2. Apply dynamic circular left shift using lookup table ({@link #leftShiftTable})
+     * 3. XOR result with second key fragment ({@link #keyPart2})
+     * 
+     * In fixed shift mode:
+     * 1. XOR data with the key ({@link #keyPart1})
+     * 2. Apply fixed circular left shift ({@link #shift})
+     * </p>
+     *
+     * <p>Performance Optimizations:
+     * - For large data (≥16KB) with {@link #parallelProcessing} enabled, uses parallel processing
+     * - For small data (≤256 bytes) in dynamic mode, uses specialized small data optimization ({@link #encryptSmall(byte[])})
+     * - For small data (≤128 bytes) in fixed mode, uses unrolled loop optimization ({@link #encryptUnrolled(byte[])})
+     * - Operates directly on input array to avoid memory copy overhead
+     * - Uses lookup tables to eliminate bitwise operations in dynamic mode
+     * </p>
+     *
+     * <p>Usage example:
      * <pre>{@code
      * FastBlurUltra encryptor = new FastBlurUltra();
      * byte[] original = "Hello".getBytes(StandardCharsets.UTF_8);
      * byte[] encrypted = encryptor.encrypt(original);
-     * }</pre>
+     * }
+     * </pre>
      * </p>
      *
-     * @param data 原始字节数组
-     * @return 加密后字节数组
+     * @param data the original byte array
+     * @return the encrypted byte array (same array as input)
+     * @throws IllegalArgumentException if the input data is malformed
+     * @see #decrypt(byte[])
+     * @see #dynamicShift
+     * @see #parallelProcessing
+     * @see #leftShiftTable
      */
     @Override
     public byte[] encrypt(byte[] data) {
@@ -231,11 +330,23 @@ public class FastBlurUltra extends FastBlurBase {
     }
     
     /**
-     * 展开循环的小数据加密方法（固定位移模式）
-     * 专门针对小于等于128字节的数据进行优化
+     * Unrolled loop encryption method for small data (fixed shift mode).
+     * <br/>
+     * Specifically optimized for data less than or equal to 128 bytes.
      *
-     * @param data 原始字节数组
-     * @return 加密后字节数组
+     * <p>Optimization Techniques:
+     * <ul>
+     *   <li>Loop unrolling to reduce branch prediction misses</li>
+     *   <li>Local variable caching of frequently accessed fields</li>
+     *   <li>Processing 8 bytes at a time in the unrolled loop</li>
+     *   <li>Used only in fixed shift mode</li>
+     * </ul>
+     * </p>
+     *
+     * @param data the original byte array
+     * @return the encrypted byte array (same array as input)
+     * @see #encrypt(byte[])
+     * @see #dynamicShift
      */
     private byte[] encryptUnrolled(byte[] data) {
         final int len = data.length;
@@ -308,11 +419,32 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * 小数据量快速加密方法（展开循环版本）
-     * 专门针对小于等于256字节的数据进行优化
+     * Fast encryption method for small data (unrolled loop version).
+     * <br/>
+     * Specifically optimized for data less than or equal to 256 bytes.
      *
-     * @param data 原始字节数组（长度必须<=256）
-     * @return 加密后字节数组
+     * <p>Optimization Techniques:
+     * <ul>
+     *   <li>Completely unrolled loops for very small data (≤8 bytes)</li>
+     *   <li>Switch-based dispatch for optimal branch prediction</li>
+     *   <li>Lookup table-based shift operations to eliminate bitwise computations</li>
+     *   <li>Batch processing for larger small data (64-256 bytes) in {@link #encryptSmallBatch(byte[])}</li>
+     * </ul>
+     * </p>
+     *
+     * <p>Algorithm:
+     * For each byte in the data:
+     * 1. XOR with first key fragment ({@link #keyPart1})
+     * 2. Apply dynamic circular left shift using lookup table ({@link #leftShiftTable})
+     * 3. XOR with second key fragment ({@link #keyPart2})
+     * </p>
+     *
+     * @param data the original byte array (length must be ≤256)
+     * @return the encrypted byte array (same array as input)
+     * @see #encrypt(byte[])
+     * @see #dynamicShift
+     * @see #encryptSmallBatch(byte[])
+     * @see #leftShiftTable
      */
     public byte[] encryptSmall(byte[] data) {
         if (data == null || data.length == 0) {
@@ -352,11 +484,30 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * 批量处理的小数据加密方法
-     * 专门针对64-256字节的数据进行优化
+     * Batch processing encryption method for small data.
+     * <br/>
+     * Specifically optimized for 64-256 byte data.
      *
-     * @param data 原始字节数组
-     * @return 加密后字节数组
+     * <p>Optimization Techniques:
+     * <ul>
+     *   <li>Reduced function call overhead through batching</li>
+     *   <li>Local variable caching of frequently accessed fields
+     *   <li>Lookup table-based shift operations to eliminate bitwise computations</li>
+     * </ul>
+     * </p>
+     *
+     * <p>Algorithm:
+     * For each byte in the data:
+     * 1. XOR with first key fragment ({@link #keyPart1})
+     * 2. Apply dynamic circular left shift using lookup table ({@link #leftShiftTable})
+     * 3. XOR with second key fragment ({@link #keyPart2})
+     * </p>
+     *
+     * @param data the original byte array
+     * @return the encrypted byte array (same array as input)
+     * @see #encryptSmall(byte[])
+     * @see #dynamicShift
+     * @see #leftShiftTable
      */
     private byte[] encryptSmallBatch(byte[] data) {
         final int len = data.length;
