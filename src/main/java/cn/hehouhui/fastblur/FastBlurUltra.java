@@ -1,17 +1,20 @@
 package cn.hehouhui.fastblur;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 
 /**
  * 简单轻量的混淆算法（极速版）
  * 高性能可逆轻量级加密工具（动态位移增强混淆，不保证安全性）
  * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
- * 
+ *
  * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
  * 相比普通版本进行了极致性能优化，适用于需要极致性能的轻量级数据保护场景。</p>
- * 
+ *
  * <p>极致优化点：
  * 1. 使用查找表完全避免位运算
  * 2. 展开小规模循环减少分支预测失败
@@ -36,30 +39,25 @@ import java.util.Base64;
 public class FastBlurUltra extends FastBlurBase {
 
     /**
-     * 字符编码方式，默认使用UTF-8
-     */
-    private final Charset encoding;
-    
-    /**
      * 预计算的密钥片段1（用于异或运算）
      */
     private final byte keyPart1;
-    
+
     /**
      * 预计算的密钥片段2（用于异或运算）
      */
     private final byte keyPart2;
-    
+
     /**
      * 用于位移计算的掩码
      */
     private final int shiftMask;
-    
+
     /**
      * 左循环位移查找表
      */
     private final byte[][] leftShiftTable;
-    
+
     /**
      * 右循环位移查找表
      */
@@ -67,7 +65,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra();
@@ -80,7 +78,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码方式初始化FastBlurUltra实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8);
@@ -95,7 +93,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurUltra实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB);
@@ -112,7 +110,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurUltra实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurUltra blur = new FastBlurUltra(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB, true);
@@ -130,11 +128,11 @@ public class FastBlurUltra extends FastBlurBase {
         this.keyPart1 = (byte) (key & 0xFF);
         this.keyPart2 = (byte) ((key >> 8) & 0xFF);
         this.shiftMask = keySegment & 0xFF;
-        
+
         // 预计算查找表
         this.leftShiftTable = new byte[8][256];
         this.rightShiftTable = new byte[8][256];
-        
+
         for (int shift = 0; shift < 8; shift++) {
             for (int b = 0; b < 256; b++) {
                 // 左循环位移
@@ -147,7 +145,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 动态计算位移位数（核心增强点）
-     * 
+     *
      * <p>根据字节索引和密钥分段值动态计算位移位数，确保结果在0-7之间。
      * 这种动态计算增加了算法的复杂度和安全性。</p>
      *
@@ -168,7 +166,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 加密字节数组（动态位移增强混淆）
-     * 
+     *
      * <p>加密过程分为三个步骤：
      * 1. 使用密钥的第一部分与数据进行异或运算
      * 2. 对结果进行动态循环左移
@@ -191,21 +189,26 @@ public class FastBlurUltra extends FastBlurBase {
             return data;
         }
 
+        // 如果启用了并行处理且数据足够大，则使用并行处理
+        if (parallelProcessing && data.length >= 8192) {
+            return encryptParallel(data);
+        }
+
         // 直接在原数组上操作，避免数组复制开销
         final int len = data.length;
         for (int i = 0; i < len; i++) {
             // 将byte转换为unsigned int以用作查找表索引
             final int b = data[i] & 0xFF;
-            
+
             // 步骤1：第一段密钥异或
             final int xored1 = b ^ (keyPart1 & 0xFF);
-            
+
             // 获取动态位移值
             final int dynamicShift = getDynamicShift(i);
-            
+
             // 步骤2：动态循环左移（使用查找表）
             final int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
-            
+
             // 步骤3：第二段密钥异或
             data[i] = (byte) (shifted ^ (keyPart2 & 0xFF));
         }
@@ -223,7 +226,7 @@ public class FastBlurUltra extends FastBlurBase {
         if (data == null || data.length == 0) {
             return data;
         }
-        
+
         final int len = data.length;
         // 展开小循环以减少分支开销
         switch (len) {
@@ -252,7 +255,7 @@ public class FastBlurUltra extends FastBlurBase {
 
     /**
      * 解密字节数组（加密的逆操作，动态位移还原）
-     * 
+     *
      * <p>解密是加密的逆向操作，其步骤顺序与加密相反：
      * 1. 使用密钥的第二部分与数据进行异或运算（逆向步骤3）
      * 2. 对结果进行动态循环右移（逆向步骤2）
@@ -275,21 +278,26 @@ public class FastBlurUltra extends FastBlurBase {
             return encryptedData;
         }
 
+        // 如果启用了并行处理且数据足够大，则使用并行处理
+        if (parallelProcessing && encryptedData.length >= 8192) {
+            return decryptParallel(encryptedData);
+        }
+
         // 直接在原数组上操作，避免数组复制开销
         final int len = encryptedData.length;
         for (int i = 0; i < len; i++) {
             // 将byte转换为unsigned int以用作查找表索引
             final int b = encryptedData[i] & 0xFF;
-            
+
             // 逆步骤3：第二段密钥异或还原
             final int xored1 = b ^ (keyPart2 & 0xFF);
-            
+
             // 获取动态位移值（使用相同的规则）
             final int dynamicShift = getDynamicShift(i);
-            
+
             // 逆步骤2：动态循环右移（使用查找表）
             final int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
-            
+
             // 逆步骤1：第一段密钥异或还原
             encryptedData[i] = (byte) (shifted ^ (keyPart1 & 0xFF));
         }
@@ -307,7 +315,7 @@ public class FastBlurUltra extends FastBlurBase {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
-        
+
         final int len = encryptedData.length;
         // 展开小循环以减少分支开销
         switch (len) {
@@ -362,5 +370,157 @@ public class FastBlurUltra extends FastBlurBase {
     public boolean decryptZeroCopy(ByteBuffer buffer, int offset, int length) {
         // 回退到常规解密方法
         return decrypt(buffer, offset, length);
+    }
+
+    /**
+     * 并行加密字节数组（用于处理大数据块）
+     *
+     * <p>将数据分块并行处理，充分利用多核CPU优势</p>
+     *
+     * @param data 原始字节数组
+     * @return 加密后字节数组
+     */
+    public byte[] encryptParallel(byte[] data) {
+        if (data == null || data.length == 0) {
+            return data;
+        }
+
+        // 创建数据副本以避免修改原始数据
+        byte[] dataCopy = new byte[data.length];
+        System.arraycopy(data, 0, dataCopy, 0, data.length);
+
+        // 使用ForkJoin框架进行并行处理
+        ForkJoinPool pool = new ForkJoinPool();
+        try {
+            pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
+        } finally {
+            pool.shutdown();
+        }
+
+        return dataCopy;
+    }
+
+    /**
+     * 并行解密字节数组（用于处理大数据块）
+     *
+     * <p>将数据分块并行处理，充分利用多核CPU优势</p>
+     *
+     * @param encryptedData 加密后的字节数组
+     * @return 原始字节数组
+     */
+    public byte[] decryptParallel(byte[] encryptedData) {
+        if (encryptedData == null || encryptedData.length == 0) {
+            return encryptedData;
+        }
+
+        // 创建数据副本以避免修改原始数据
+        byte[] dataCopy = new byte[encryptedData.length];
+        System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
+
+        // 使用ForkJoin框架进行并行处理
+        ForkJoinPool pool = new ForkJoinPool();
+        try {
+            pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
+        } finally {
+            pool.shutdown();
+        }
+
+        return dataCopy;
+    }
+
+    /**
+     * 加密任务（用于并行处理）
+     */
+    private static class EncryptTask extends RecursiveAction {
+        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = 9130525864140232216L;
+        private final byte[] data;
+        private final int start;
+        private final int end;
+        private final byte keyPart1;
+        private final byte keyPart2;
+        private final int shiftMask;
+        private final byte[][] leftShiftTable;
+        private final byte[][] rightShiftTable;
+
+        EncryptTask(byte[] data, int start, int end, byte keyPart1, byte keyPart2, int shiftMask,
+                   byte[][] leftShiftTable, byte[][] rightShiftTable) {
+            this.data = data;
+            this.start = start;
+            this.end = end;
+            this.keyPart1 = keyPart1;
+            this.keyPart2 = keyPart2;
+            this.shiftMask = shiftMask;
+            this.leftShiftTable = leftShiftTable;
+            this.rightShiftTable = rightShiftTable;
+        }
+
+        @Override
+        protected void compute() {
+            if (end - start <= THRESHOLD) {
+                // 直接处理数据块
+                for (int i = start; i < end; i++) {
+                    int dynamicShift = (i + shiftMask) & 0x7;
+                    int b = data[i] & 0xFF;
+                    int xored1 = b ^ (keyPart1 & 0xFF);
+                    int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
+                    data[i] = (byte) (shifted ^ (keyPart2 & 0xFF));
+                }
+            } else {
+                // 分割任务
+                int mid = (start + end) / 2;
+                EncryptTask leftTask = new EncryptTask(data, start, mid, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable);
+                EncryptTask rightTask = new EncryptTask(data, mid, end, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable);
+                invokeAll(leftTask, rightTask);
+            }
+        }
+    }
+
+    /**
+     * 解密任务（用于并行处理）
+     */
+    private static class DecryptTask extends RecursiveAction {
+        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = 8201094641149163487L;
+        private final byte[] data;
+        private final int start;
+        private final int end;
+        private final byte keyPart1;
+        private final byte keyPart2;
+        private final int shiftMask;
+        private final byte[][] leftShiftTable;
+        private final byte[][] rightShiftTable;
+
+        DecryptTask(byte[] data, int start, int end, byte keyPart1, byte keyPart2, int shiftMask,
+                   byte[][] leftShiftTable, byte[][] rightShiftTable) {
+            this.data = data;
+            this.start = start;
+            this.end = end;
+            this.keyPart1 = keyPart1;
+            this.keyPart2 = keyPart2;
+            this.shiftMask = shiftMask;
+            this.leftShiftTable = leftShiftTable;
+            this.rightShiftTable = rightShiftTable;
+        }
+
+        @Override
+        protected void compute() {
+            if (end - start <= THRESHOLD) {
+                // 直接处理数据块
+                for (int i = start; i < end; i++) {
+                    int dynamicShift = (i + shiftMask) & 0x7;
+                    int b = data[i] & 0xFF;
+                    int xored1 = b ^ (keyPart2 & 0xFF);
+                    int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
+                    data[i] = (byte) (shifted ^ (keyPart1 & 0xFF));
+                }
+            } else {
+                // 分割任务
+                int mid = (start + end) / 2;
+                DecryptTask leftTask = new DecryptTask(data, start, mid, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable);
+                DecryptTask rightTask = new DecryptTask(data, mid, end, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable);
+                invokeAll(leftTask, rightTask);
+            }
+        }
     }
 }

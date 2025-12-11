@@ -1,8 +1,11 @@
 package cn.hehouhui.fastblur;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.RecursiveAction;
 
 /**
  * 简单轻量的混淆算法（向量化版）
@@ -130,6 +133,11 @@ public class FastBlurVectorized extends FastBlurBase {
             return data;
         }
 
+        // 如果启用了并行处理且数据足够大，则使用并行处理
+        if (parallelProcessing && data.length >= 8192) {
+            return encryptParallel(data);
+        }
+
         final int len = data.length;
         final byte kp1 = keyPart1;
         final byte kp2 = keyPart2;
@@ -233,6 +241,11 @@ public class FastBlurVectorized extends FastBlurBase {
     public byte[] decrypt(byte[] encryptedData) {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
+        }
+
+        // 如果启用了并行处理且数据足够大，则使用并行处理
+        if (parallelProcessing && encryptedData.length >= 8192) {
+            return decryptParallel(encryptedData);
         }
 
         final int len = encryptedData.length;
@@ -354,5 +367,305 @@ public class FastBlurVectorized extends FastBlurBase {
     public boolean decryptZeroCopy(ByteBuffer buffer, int offset, int length) {
         // 回退到常规解密方法
         return decrypt(buffer, offset, length);
+    }
+
+    /**
+     * 并行加密字节数组（用于处理大数据块）
+     * 
+     * <p>将数据分块并行处理，充分利用多核CPU优势</p>
+     *
+     * @param data 原始字节数组
+     * @return 加密后字节数组
+     */
+    public byte[] encryptParallel(byte[] data) {
+        if (data == null || data.length == 0) {
+            return data;
+        }
+        
+        // 创建数据副本以避免修改原始数据
+        byte[] dataCopy = new byte[data.length];
+        System.arraycopy(data, 0, dataCopy, 0, data.length);
+        
+        // 使用ForkJoin框架进行并行处理
+        ForkJoinPool pool = new ForkJoinPool();
+        try {
+            pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        } finally {
+            pool.shutdown();
+        }
+        
+        return dataCopy;
+    }
+
+    /**
+     * 并行解密字节数组（用于处理大数据块）
+     * 
+     * <p>将数据分块并行处理，充分利用多核CPU优势</p>
+     *
+     * @param encryptedData 加密后的字节数组
+     * @return 原始字节数组
+     */
+    public byte[] decryptParallel(byte[] encryptedData) {
+        if (encryptedData == null || encryptedData.length == 0) {
+            return encryptedData;
+        }
+        
+        // 创建数据副本以避免修改原始数据
+        byte[] dataCopy = new byte[encryptedData.length];
+        System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
+        
+        // 使用ForkJoin框架进行并行处理
+        ForkJoinPool pool = new ForkJoinPool();
+        try {
+            pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        } finally {
+            pool.shutdown();
+        }
+        
+        return dataCopy;
+    }
+
+    /**
+     * 加密任务（用于并行处理）
+     */
+    private static class EncryptTask extends RecursiveAction {
+        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = -1134508474606636622L;
+        private final byte[] data;
+        private final int start;
+        private final int end;
+        private final byte keyPart1;
+        private final byte keyPart2;
+        private final int shiftMask;
+
+        EncryptTask(byte[] data, int start, int end, byte keyPart1, byte keyPart2, int shiftMask) {
+            this.data = data;
+            this.start = start;
+            this.end = end;
+            this.keyPart1 = keyPart1;
+            this.keyPart2 = keyPart2;
+            this.shiftMask = shiftMask;
+        }
+
+        @Override
+        protected void compute() {
+            final byte kp1 = keyPart1;
+            final byte kp2 = keyPart2;
+            final int mask = shiftMask;
+            
+            if (end - start <= THRESHOLD) {
+                // 直接处理数据块
+                int i = start;
+                
+                // 主循环：每次处理8个字节
+                for (; i <= end - 8; i += 8) {
+                    // 批量计算位移值
+                    final int s0 = (i + mask) & 0x7;
+                    final int s1 = ((i + 1) + mask) & 0x7;
+                    final int s2 = ((i + 2) + mask) & 0x7;
+                    final int s3 = ((i + 3) + mask) & 0x7;
+                    final int s4 = ((i + 4) + mask) & 0x7;
+                    final int s5 = ((i + 5) + mask) & 0x7;
+                    final int s6 = ((i + 6) + mask) & 0x7;
+                    final int s7 = ((i + 7) + mask) & 0x7;
+                    
+                    // 批量处理加密操作
+                    data[i] ^= kp1;
+                    if (s0 != 0) {
+                        final int u = data[i] & 0xFF;
+                        data[i] = (byte) (((u << s0) | (u >>> (8 - s0))) & 0xFF);
+                    }
+                    data[i] ^= kp2;
+                    
+                    data[i+1] ^= kp1;
+                    if (s1 != 0) {
+                        final int u = data[i+1] & 0xFF;
+                        data[i+1] = (byte) (((u << s1) | (u >>> (8 - s1))) & 0xFF);
+                    }
+                    data[i+1] ^= kp2;
+                    
+                    data[i+2] ^= kp1;
+                    if (s2 != 0) {
+                        final int u = data[i+2] & 0xFF;
+                        data[i+2] = (byte) (((u << s2) | (u >>> (8 - s2))) & 0xFF);
+                    }
+                    data[i+2] ^= kp2;
+                    
+                    data[i+3] ^= kp1;
+                    if (s3 != 0) {
+                        final int u = data[i+3] & 0xFF;
+                        data[i+3] = (byte) (((u << s3) | (u >>> (8 - s3))) & 0xFF);
+                    }
+                    data[i+3] ^= kp2;
+                    
+                    data[i+4] ^= kp1;
+                    if (s4 != 0) {
+                        final int u = data[i+4] & 0xFF;
+                        data[i+4] = (byte) (((u << s4) | (u >>> (8 - s4))) & 0xFF);
+                    }
+                    data[i+4] ^= kp2;
+                    
+                    data[i+5] ^= kp1;
+                    if (s5 != 0) {
+                        final int u = data[i+5] & 0xFF;
+                        data[i+5] = (byte) (((u << s5) | (u >>> (8 - s5))) & 0xFF);
+                    }
+                    data[i+5] ^= kp2;
+                    
+                    data[i+6] ^= kp1;
+                    if (s6 != 0) {
+                        final int u = data[i+6] & 0xFF;
+                        data[i+6] = (byte) (((u << s6) | (u >>> (8 - s6))) & 0xFF);
+                    }
+                    data[i+6] ^= kp2;
+                    
+                    data[i+7] ^= kp1;
+                    if (s7 != 0) {
+                        final int u = data[i+7] & 0xFF;
+                        data[i+7] = (byte) (((u << s7) | (u >>> (8 - s7))) & 0xFF);
+                    }
+                    data[i+7] ^= kp2;
+                }
+                
+                // 处理剩余不足8个字节的数据
+                for (; i < end; i++) {
+                    final int shift = (i + mask) & 0x7;
+                    data[i] ^= kp1;
+                    if (shift != 0) {
+                        final int u = data[i] & 0xFF;
+                        data[i] = (byte) (((u << shift) | (u >>> (8 - shift))) & 0xFF);
+                    }
+                    data[i] ^= kp2;
+                }
+            } else {
+                // 分割任务
+                int mid = (start + end) / 2;
+                EncryptTask leftTask = new EncryptTask(data, start, mid, keyPart1, keyPart2, shiftMask);
+                EncryptTask rightTask = new EncryptTask(data, mid, end, keyPart1, keyPart2, shiftMask);
+                invokeAll(leftTask, rightTask);
+            }
+        }
+    }
+
+    /**
+     * 解密任务（用于并行处理）
+     */
+    private static class DecryptTask extends RecursiveAction {
+        private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = 6527346346469821233L;
+        private final byte[] data;
+        private final int start;
+        private final int end;
+        private final byte keyPart1;
+        private final byte keyPart2;
+        private final int shiftMask;
+
+        DecryptTask(byte[] data, int start, int end, byte keyPart1, byte keyPart2, int shiftMask) {
+            this.data = data;
+            this.start = start;
+            this.end = end;
+            this.keyPart1 = keyPart1;
+            this.keyPart2 = keyPart2;
+            this.shiftMask = shiftMask;
+        }
+
+        @Override
+        protected void compute() {
+            final byte kp1 = keyPart1;
+            final byte kp2 = keyPart2;
+            final int mask = shiftMask;
+            
+            if (end - start <= THRESHOLD) {
+                // 直接处理数据块
+                int i = start;
+                
+                // 主循环：每次处理8个字节
+                for (; i <= end - 8; i += 8) {
+                    // 批量计算位移值
+                    final int s0 = (i + mask) & 0x7;
+                    final int s1 = ((i + 1) + mask) & 0x7;
+                    final int s2 = ((i + 2) + mask) & 0x7;
+                    final int s3 = ((i + 3) + mask) & 0x7;
+                    final int s4 = ((i + 4) + mask) & 0x7;
+                    final int s5 = ((i + 5) + mask) & 0x7;
+                    final int s6 = ((i + 6) + mask) & 0x7;
+                    final int s7 = ((i + 7) + mask) & 0x7;
+                    
+                    // 批量处理解密操作（逆序执行加密的逆操作）
+                    data[i] ^= kp2;
+                    if (s0 != 0) {
+                        final int u = data[i] & 0xFF;
+                        data[i] = (byte) (((u >>> s0) | (u << (8 - s0))) & 0xFF);
+                    }
+                    data[i] ^= kp1;
+                    
+                    data[i+1] ^= kp2;
+                    if (s1 != 0) {
+                        final int u = data[i+1] & 0xFF;
+                        data[i+1] = (byte) (((u >>> s1) | (u << (8 - s1))) & 0xFF);
+                    }
+                    data[i+1] ^= kp1;
+                    
+                    data[i+2] ^= kp2;
+                    if (s2 != 0) {
+                        final int u = data[i+2] & 0xFF;
+                        data[i+2] = (byte) (((u >>> s2) | (u << (8 - s2))) & 0xFF);
+                    }
+                    data[i+2] ^= kp1;
+                    
+                    data[i+3] ^= kp2;
+                    if (s3 != 0) {
+                        final int u = data[i+3] & 0xFF;
+                        data[i+3] = (byte) (((u >>> s3) | (u << (8 - s3))) & 0xFF);
+                    }
+                    data[i+3] ^= kp1;
+                    
+                    data[i+4] ^= kp2;
+                    if (s4 != 0) {
+                        final int u = data[i+4] & 0xFF;
+                        data[i+4] = (byte) (((u >>> s4) | (u << (8 - s4))) & 0xFF);
+                    }
+                    data[i+4] ^= kp1;
+                    
+                    data[i+5] ^= kp2;
+                    if (s5 != 0) {
+                        final int u = data[i+5] & 0xFF;
+                        data[i+5] = (byte) (((u >>> s5) | (u << (8 - s5))) & 0xFF);
+                    }
+                    data[i+5] ^= kp1;
+                    
+                    data[i+6] ^= kp2;
+                    if (s6 != 0) {
+                        final int u = data[i+6] & 0xFF;
+                        data[i+6] = (byte) (((u >>> s6) | (u << (8 - s6))) & 0xFF);
+                    }
+                    data[i+6] ^= kp1;
+                    
+                    data[i+7] ^= kp2;
+                    if (s7 != 0) {
+                        final int u = data[i+7] & 0xFF;
+                        data[i+7] = (byte) (((u >>> s7) | (u << (8 - s7))) & 0xFF);
+                    }
+                    data[i+7] ^= kp1;
+                }
+                
+                // 处理剩余不足8个字节的数据
+                for (; i < end; i++) {
+                    final int shift = (i + mask) & 0x7;
+                    data[i] ^= kp2;
+                    if (shift != 0) {
+                        final int u = data[i] & 0xFF;
+                        data[i] = (byte) (((u >>> shift) | (u << (8 - shift))) & 0xFF);
+                    }
+                    data[i] ^= kp1;
+                }
+            } else {
+                // 分割任务
+                int mid = (start + end) / 2;
+                DecryptTask leftTask = new DecryptTask(data, start, mid, keyPart1, keyPart2, shiftMask);
+                DecryptTask rightTask = new DecryptTask(data, mid, end, keyPart1, keyPart2, shiftMask);
+                invokeAll(leftTask, rightTask);
+            }
+        }
     }
 }

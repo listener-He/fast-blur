@@ -1,20 +1,17 @@
 package cn.hehouhui.fastblur;
 
-import cn.hehouhui.fastblur.FastBlurBase;
-
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 
 /**
  * 简单轻量的混淆算法（自适应优化版）
  * 高性能可逆轻量级加密工具（动态位移增强混淆，不保证安全性）
  * 核心：动态位移+异或位运算，极快、可逆、混淆性优于固定位移
- * 
+ *
  * <p>该类提供了一种简单的数据混淆机制，通过动态位移和异或运算实现可逆的数据变换。
  * 根据数据大小自动选择最优的处理策略，适用于各种场景下的高性能数据保护。</p>
- * 
+ *
  * <p>自适应优化策略：
  * 1. 小数据（≤256字节）：使用查找表优化版本
  * 2. 中等数据（256-2048字节）：使用向量化优化版本
@@ -40,12 +37,12 @@ public class FastBlurAdaptive extends FastBlurBase {
      * 极速版本实例（用于小数据处理）
      */
     private final cn.hehouhui.fastblur.FastBlurUltra fastVersion;
-    
+
     /**
      * 向量化版本实例（用于中等数据处理）
      */
     private final cn.hehouhui.fastblur.FastBlurVectorized vectorizedVersion;
-    
+
     /**
      * 优化版本实例（用于大数据处理）
      */
@@ -53,7 +50,7 @@ public class FastBlurAdaptive extends FastBlurBase {
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive();
@@ -66,7 +63,7 @@ public class FastBlurAdaptive extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码方式初始化FastBlurAdaptive实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8);
@@ -81,16 +78,16 @@ public class FastBlurAdaptive extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥和密钥分段初始化FastBlurAdaptive实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB);
      * }</pre>
      * </p>
      *
-     * @param encoding    字符编码方式
-     * @param key         64位密钥
-     * @param keySegment  密钥分段值，用于动态位移计算
+     * @param encoding   字符编码方式
+     * @param key        64位密钥
+     * @param keySegment 密钥分段值，用于动态位移计算
      */
     public FastBlurAdaptive(Charset encoding, long key, byte keySegment) {
         this(encoding, key, keySegment, false);
@@ -98,7 +95,7 @@ public class FastBlurAdaptive extends FastBlurBase {
 
     /**
      * 构造函数，使用指定的编码、密钥、密钥分段和平行处理选项初始化FastBlurAdaptive实例
-     * 
+     *
      * <p>示例用法：
      * <pre>{@code
      * FastBlurAdaptive blur = new FastBlurAdaptive(StandardCharsets.UTF_8, 0x123456789ABCDEF0L, (byte) 0xAB, true);
@@ -123,6 +120,7 @@ public class FastBlurAdaptive extends FastBlurBase {
      * 根据数据大小选择最优的加密策略
      *
      * @param data 原始字节数组
+     *
      * @return 加密后字节数组
      */
     @Override
@@ -149,6 +147,7 @@ public class FastBlurAdaptive extends FastBlurBase {
      * 根据数据大小选择最优的解密策略
      *
      * @param encryptedData 加密后的字节数组
+     *
      * @return 原始字节数组
      */
     @Override
@@ -177,6 +176,7 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param buffer 包含原始数据的直接缓冲区
      * @param offset 数据偏移量
      * @param length 数据长度
+     *
      * @return 执行结果，true表示成功，false表示失败
      */
     @Override
@@ -192,6 +192,7 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param buffer 包含加密数据的直接缓冲区
      * @param offset 数据偏移量
      * @param length 数据长度
+     *
      * @return 执行结果，true表示成功，false表示失败
      */
     @Override

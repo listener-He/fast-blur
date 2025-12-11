@@ -418,6 +418,7 @@ public class FastBlurSimple extends FastBlurBase {
      */
     private static class EncryptTask extends RecursiveAction {
         private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = -1180001722974992448L;
         private final byte[] data;
         private final int start;
         private final int end;
@@ -459,6 +460,7 @@ public class FastBlurSimple extends FastBlurBase {
      */
     private static class DecryptTask extends RecursiveAction {
         private static final int THRESHOLD = 8192; // 任务阈值：8KB
+        private static final long serialVersionUID = -4052727379621115969L;
         private final byte[] data;
         private final int start;
         private final int end;
