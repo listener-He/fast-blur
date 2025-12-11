@@ -3,20 +3,19 @@ package cn.hehouhui.fastblur;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
  * Simple lightweight obfuscation algorithm (optimized version).
  * <br/>
- * High-performance reversible lightweight encryption tool (supports fixed shift and 
- * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift + 
+ * High-performance reversible lightweight encryption tool (supports fixed shift and
+ * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift +
  * XOR bitwise operations, extremely fast, reversible, obfuscation superior to fixed shift.
  *
- * <p>This class provides a simple data obfuscation mechanism that implements 
+ * <p>This class provides a simple data obfuscation mechanism that implements
  * reversible data transformation through dynamic shift and XOR operations.
- * Compared to the original version, multiple performance optimizations have been made, 
+ * Compared to the original version, multiple performance optimizations have been made,
  * suitable for lightweight data protection scenarios requiring extreme performance.</p>
  *
  * <p>Optimizations:
@@ -28,8 +27,8 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * <p>Design Philosophy:
- * The optimized version focuses on reducing computational overhead through various 
- * micro-optimizations. It balances performance gains with code complexity to 
+ * The optimized version focuses on reducing computational overhead through various
+ * micro-optimizations. It balances performance gains with code complexity to
  * provide a good compromise between speed and maintainability.
  * </p>
  *
@@ -44,17 +43,17 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * @author HeHui
- * @since 1.0
  * @see FastBlurBase
  * @see FastBlurStrategy#MEMORY_FIRST
+ * @since 1.0
  */
 public class FastBlurOptimized extends FastBlurBase {
 
     /**
      * Default constructor using UTF-8 character set encoding.
      * <br/>
-     * Initializes a FastBlurOptimized instance with UTF-8 encoding and default 
-     * configuration values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurOptimized instance with UTF-8 encoding and default
+     * configuration values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -72,8 +71,8 @@ public class FastBlurOptimized extends FastBlurBase {
     /**
      * Constructor initializing a FastBlurOptimized instance with the specified encoding.
      * <br/>
-     * Initializes a FastBlurOptimized instance with the given character encoding and 
-     * default key and shift values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurOptimized instance with the given character encoding and
+     * default key and shift values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -83,6 +82,7 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param encoding character encoding method
+     *
      * @see Charset
      */
     public FastBlurOptimized(Charset encoding) {
@@ -90,10 +90,10 @@ public class FastBlurOptimized extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurOptimized instance with the specified encoding, 
+     * Constructor initializing a FastBlurOptimized instance with the specified encoding,
      * key, and key segment (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurOptimized instance in dynamic shift mode with the given 
+     * Initializes a FastBlurOptimized instance in dynamic shift mode with the given
      * parameters. Parallel processing is disabled.
      *
      * <p>Usage example:
@@ -102,9 +102,10 @@ public class FastBlurOptimized extends FastBlurBase {
      * }</pre>
      * </p>
      *
-     * @param encoding    character encoding method
-     * @param key         64-bit key
-     * @param keySegment  key segment value for dynamic shift calculation
+     * @param encoding   character encoding method
+     * @param key        64-bit key
+     * @param keySegment key segment value for dynamic shift calculation
+     *
      * @see Charset
      */
     public FastBlurOptimized(Charset encoding, long key, byte keySegment) {
@@ -112,10 +113,10 @@ public class FastBlurOptimized extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurOptimized instance with the specified encoding, 
+     * Constructor initializing a FastBlurOptimized instance with the specified encoding,
      * key, key segment, and parallel processing option (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurOptimized instance in dynamic shift mode with the given 
+     * Initializes a FastBlurOptimized instance in dynamic shift mode with the given
      * parameters. Parallel processing can be enabled.
      *
      * <p>Usage example:
@@ -128,15 +129,16 @@ public class FastBlurOptimized extends FastBlurBase {
      * @param key                64-bit key
      * @param keySegment         key segment value for dynamic shift calculation
      * @param parallelProcessing whether to enable parallel processing
+     *
      * @see Charset
      * @see #parallelProcessing
      */
     public FastBlurOptimized(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
         this(encoding, key, keySegment, true, parallelProcessing);
     }
-    
+
     /**
-     * Constructor initializing a FastBlurOptimized instance with the specified encoding, 
+     * Constructor initializing a FastBlurOptimized instance with the specified encoding,
      * key, shift parameter, dynamic shift option, and parallel processing option.
      * <br/>
      * Fully configurable constructor for FastBlurOptimized instances.
@@ -146,16 +148,41 @@ public class FastBlurOptimized extends FastBlurBase {
      * @param shiftParam         key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
      * @param dynamicShift       whether to enable dynamic shift
      * @param parallelProcessing whether to enable parallel processing
+     *
      * @see Charset
      * @see #dynamicShift
      * @see #parallelProcessing
      */
     public FastBlurOptimized(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing, dynamicShift,
-              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
-              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
-              dynamicShift ? shiftParam & 0xFF : 0,
-              dynamicShift ? 0 : shiftParam & 0x7);
+            dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+            dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+            dynamicShift ? shiftParam & 0xFF : 0,
+            dynamicShift ? 0 : shiftParam & 0x7);
+    }
+
+    /**
+     * Constructor initializing a FastBlurOptimized instance with the specified encoding,
+     * key, shift parameter, dynamic shift option, and custom ForkJoinPool.
+     * <br/>
+     * Fully configurable constructor for FastBlurOptimized instances with custom ForkJoinPool.
+     *
+     * @param encoding     character encoding method
+     * @param key          64-bit key (dynamic shift) or key for XOR operations (fixed shift)
+     * @param shiftParam   key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
+     * @param dynamicShift whether to enable dynamic shift
+     * @param pool         custom ForkJoinPool for parallel processing
+     *
+     * @see Charset
+     * @see #dynamicShift
+     */
+    public FastBlurOptimized(Charset encoding, long key, int shiftParam, boolean dynamicShift, java.util.concurrent.ForkJoinPool pool) {
+        super(encoding, true, dynamicShift,
+            dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+            dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+            dynamicShift ? shiftParam & 0xFF : 0,
+            dynamicShift ? 0 : shiftParam & 0x7,
+            pool);
     }
 
     /**
@@ -166,7 +193,7 @@ public class FastBlurOptimized extends FastBlurBase {
      * 1. XOR the data with the first part of the key
      * 2. Perform dynamic circular left shift on the result
      * 3. XOR the result with the second part of the key
-     * 
+     * <p>
      * Fixed shift mode:
      * 1. XOR the data with the key
      * 2. Perform fixed circular left shift on the result
@@ -176,7 +203,7 @@ public class FastBlurOptimized extends FastBlurBase {
      * 1. XOR data with first key fragment ({@link #keyPart1})
      * 2. Apply dynamic circular left shift based on byte position
      * 3. XOR result with second key fragment ({@link #keyPart2})
-     * 
+     * <p>
      * In fixed shift mode:
      * 1. XOR data with the key ({@link #keyPart1})
      * 2. Apply fixed circular left shift ({@link #shift})
@@ -199,7 +226,9 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param data the original byte array
+     *
      * @return the encrypted byte array (same array as input)
+     *
      * @throws IllegalArgumentException if the input data is malformed
      * @see #decrypt(byte[])
      * @see #dynamicShift
@@ -215,7 +244,7 @@ public class FastBlurOptimized extends FastBlurBase {
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
         if (parallelProcessing && data.length >= 16384) {
-            return encryptParallel(data);
+            return encryptParallel(data, customPool);
         }
 
         // 对于小数据(<=128字节)，使用展开循环优化
@@ -248,7 +277,7 @@ public class FastBlurOptimized extends FastBlurBase {
             for (int i = 0; i < data.length; i++) {
                 // 步骤1：密钥异或
                 data[i] ^= keyPart1;
-                
+
                 // 步骤2：固定循环左移
                 if (shift != 0) {
                     int unsigned = data[i] & 0xFF;
@@ -275,7 +304,9 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param data the original byte array
+     *
      * @return the encrypted byte array (same array as input)
+     *
      * @see #encrypt(byte[])
      * @see #dynamicShift
      */
@@ -298,28 +329,28 @@ public class FastBlurOptimized extends FastBlurBase {
             data[i] ^= kp2;
 
             int dynamicShift1 = FastBlurUtils.getDynamicShift(i + 1, mask);
-            data[i+1] ^= kp1;
+            data[i + 1] ^= kp1;
             if (dynamicShift1 != 0) {
-                int unsigned = data[i+1] & 0xFF;
-                data[i+1] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift1) & 0xFF);
+                int unsigned = data[i + 1] & 0xFF;
+                data[i + 1] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift1) & 0xFF);
             }
-            data[i+1] ^= kp2;
+            data[i + 1] ^= kp2;
 
             int dynamicShift2 = FastBlurUtils.getDynamicShift(i + 2, mask);
-            data[i+2] ^= kp1;
+            data[i + 2] ^= kp1;
             if (dynamicShift2 != 0) {
-                int unsigned = data[i+2] & 0xFF;
-                data[i+2] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift2) & 0xFF);
+                int unsigned = data[i + 2] & 0xFF;
+                data[i + 2] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift2) & 0xFF);
             }
-            data[i+2] ^= kp2;
+            data[i + 2] ^= kp2;
 
             int dynamicShift3 = FastBlurUtils.getDynamicShift(i + 3, mask);
-            data[i+3] ^= kp1;
+            data[i + 3] ^= kp1;
             if (dynamicShift3 != 0) {
-                int unsigned = data[i+3] & 0xFF;
-                data[i+3] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift3) & 0xFF);
+                int unsigned = data[i + 3] & 0xFF;
+                data[i + 3] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift3) & 0xFF);
             }
-            data[i+3] ^= kp2;
+            data[i + 3] ^= kp2;
         }
 
         // 处理剩余字节
@@ -349,7 +380,7 @@ public class FastBlurOptimized extends FastBlurBase {
      * 1. XOR data with second key fragment ({@link #keyPart2})
      * 2. Apply dynamic circular right shift based on byte position
      * 3. XOR result with first key fragment ({@link #keyPart1})
-     * 
+     * <p>
      * In fixed shift mode:
      * 1. Apply fixed circular right shift ({@link #shift})
      * 2. XOR data with the key ({@link #keyPart1})
@@ -373,7 +404,9 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param encryptedData the encrypted byte array
+     *
      * @return the original byte array (same array as input)
+     *
      * @throws IllegalArgumentException if the input data is malformed
      * @see #encrypt(byte[])
      * @see #dynamicShift
@@ -426,7 +459,7 @@ public class FastBlurOptimized extends FastBlurBase {
                     int shifted = FastBlurUtils.rotateRight(unsigned, shift);
                     encryptedData[i] = (byte) (shifted & 0xFF);
                 }
-                
+
                 // 逆步骤1：密钥异或还原
                 encryptedData[i] ^= keyPart1;
             }
@@ -437,7 +470,7 @@ public class FastBlurOptimized extends FastBlurBase {
     /**
      * Unrolled loop decryption method for small data.
      * <br/>
-     * Specifically optimized for performance with small data (≤128 bytes). 
+     * Specifically optimized for performance with small data (≤128 bytes).
      * Executes the inverse operations of {@link #encryptUnrolled(byte[])}.
      *
      * <p>Optimization Techniques:
@@ -451,7 +484,9 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param encryptedData the encrypted byte array
+     *
      * @return the decrypted byte array (same array as input)
+     *
      * @see #decrypt(byte[])
      * @see #dynamicShift
      * @see #encryptUnrolled(byte[])
@@ -475,28 +510,28 @@ public class FastBlurOptimized extends FastBlurBase {
             encryptedData[i] ^= kp1;
 
             int dynamicShift1 = FastBlurUtils.getDynamicShift(i + 1, mask);
-            encryptedData[i+1] ^= kp2;
+            encryptedData[i + 1] ^= kp2;
             if (dynamicShift1 != 0) {
-                int unsigned = encryptedData[i+1] & 0xFF;
-                encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift1) & 0xFF);
+                int unsigned = encryptedData[i + 1] & 0xFF;
+                encryptedData[i + 1] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift1) & 0xFF);
             }
-            encryptedData[i+1] ^= kp1;
+            encryptedData[i + 1] ^= kp1;
 
             int dynamicShift2 = FastBlurUtils.getDynamicShift(i + 2, mask);
-            encryptedData[i+2] ^= kp2;
+            encryptedData[i + 2] ^= kp2;
             if (dynamicShift2 != 0) {
-                int unsigned = encryptedData[i+2] & 0xFF;
-                encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift2) & 0xFF);
+                int unsigned = encryptedData[i + 2] & 0xFF;
+                encryptedData[i + 2] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift2) & 0xFF);
             }
-            encryptedData[i+2] ^= kp1;
+            encryptedData[i + 2] ^= kp1;
 
             int dynamicShift3 = FastBlurUtils.getDynamicShift(i + 3, mask);
-            encryptedData[i+3] ^= kp2;
+            encryptedData[i + 3] ^= kp2;
             if (dynamicShift3 != 0) {
-                int unsigned = encryptedData[i+3] & 0xFF;
-                encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift3) & 0xFF);
+                int unsigned = encryptedData[i + 3] & 0xFF;
+                encryptedData[i + 3] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift3) & 0xFF);
             }
-            encryptedData[i+3] ^= kp1;
+            encryptedData[i + 3] ^= kp1;
         }
 
         // 处理剩余字节
@@ -513,29 +548,21 @@ public class FastBlurOptimized extends FastBlurBase {
         return encryptedData;
     }
 
+
     /**
-     * Parallel encryption of byte array (for processing large data blocks).
+     * Parallel encryption of byte array with custom ForkJoinPool.
      * <br/>
      * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
      *
-     * <p>Parallel Processing Implementation:
-     * - Uses {@link ForkJoinPool#commonPool()} to avoid frequent creation/destruction of thread pools
-     * - Employs divide-and-conquer approach with {@link EncryptTask}
-     * - Creates a copy of input data to avoid modifying the original
-     * </p>
-     *
-     * <p>Thresholds:
-     * - Parallel processing is triggered for data ≥16KB in {@link #encrypt(byte[])}
-     * - Task splitting threshold is 16KB in {@link EncryptTask}
-     * </p>
-     *
      * @param data the original byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     *
      * @return the encrypted byte array
+     *
      * @see #encrypt(byte[])
      * @see EncryptTask
-     * @see ForkJoinPool#commonPool()
      */
-    public byte[] encryptParallel(byte[] data) {
+    public byte[] encryptParallel(byte[] data, java.util.concurrent.ForkJoinPool pool) {
         if (data == null || data.length == 0) {
             return data;
         }
@@ -544,9 +571,8 @@ public class FastBlurOptimized extends FastBlurBase {
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
 
         return dataCopy;
     }
@@ -568,12 +594,31 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @param encryptedData the encrypted byte array
+     *
      * @return the original byte array
+     *
      * @see #decrypt(byte[])
      * @see DecryptTask
      * @see ForkJoinPool#commonPool()
      */
     public byte[] decryptParallel(byte[] encryptedData) {
+        return decryptParallel(encryptedData, customPool);
+    }
+
+    /**
+     * Parallel decryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param encryptedData the encrypted byte array
+     * @param pool          the ForkJoinPool to use for parallel processing
+     *
+     * @return the original byte array
+     *
+     * @see #decrypt(byte[])
+     * @see DecryptTask
+     */
+    public byte[] decryptParallel(byte[] encryptedData, java.util.concurrent.ForkJoinPool pool) {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
@@ -582,9 +627,8 @@ public class FastBlurOptimized extends FastBlurBase {
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
 
         return dataCopy;
     }
@@ -595,15 +639,17 @@ public class FastBlurOptimized extends FastBlurBase {
      * Operates directly on the ByteBuffer to avoid additional memory allocation.
      *
      * <p>Implementation:
-     * This implementation falls back to the regular encryption method. Subclasses 
-     * that can work directly with ByteBuffers should override this method for 
+     * This implementation falls back to the regular encryption method. Subclasses
+     * that can work directly with ByteBuffers should override this method for
      * improved performance.
      * </p>
      *
      * @param buffer the direct buffer containing the original data
      * @param offset the data offset
      * @param length the data length
+     *
      * @return execution result, true for success, false for failure
+     *
      * @see #encrypt(ByteBuffer, int, int)
      * @see ByteBuffer#isDirect()
      */
@@ -619,15 +665,17 @@ public class FastBlurOptimized extends FastBlurBase {
      * Operates directly on the ByteBuffer to avoid additional memory allocation.
      *
      * <p>Implementation:
-     * This implementation falls back to the regular decryption method. Subclasses 
-     * that can work directly with ByteBuffers should override this method for 
+     * This implementation falls back to the regular decryption method. Subclasses
+     * that can work directly with ByteBuffers should override this method for
      * improved performance.
      * </p>
      *
      * @param buffer the direct buffer containing the encrypted data
      * @param offset the data offset
      * @param length the data length
+     *
      * @return execution result, true for success, false for failure
+     *
      * @see #decrypt(ByteBuffer, int, int)
      * @see ByteBuffer#isDirect()
      */
@@ -640,8 +688,8 @@ public class FastBlurOptimized extends FastBlurBase {
     /**
      * Encryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles encryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles encryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -651,66 +699,65 @@ public class FastBlurOptimized extends FastBlurBase {
      * </p>
      *
      * @see RecursiveAction
-     * @see #encryptParallel(byte[])
      */
     private static class EncryptTask extends RecursiveAction {
         /**
          * Task threshold: 16KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 16384; // 任务阈值：16KB
-        
+
         private static final long serialVersionUID = -5048830231452146650L;
-        
+
         /**
          * Data to be encrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * First key fragment for XOR operations.
          * <br/>
-         * The first part of a split-key approach where the key is divided 
-         * into multiple parts that are applied at different stages of the encryption 
+         * The first part of a split-key approach where the key is divided
+         * into multiple parts that are applied at different stages of the encryption
          * process.
          *
          * @see FastBlurOptimized#keyPart1
          */
         private final byte keyPart1;
-        
+
         /**
          * Second key fragment for XOR operations.
          * <br/>
-         * The second part of a split-key approach. In dynamic shift mode, 
-         * this is applied after the shift operation, providing a form of double 
+         * The second part of a split-key approach. In dynamic shift mode,
+         * this is applied after the shift operation, providing a form of double
          * encryption for each byte.
          *
          * @see FastBlurOptimized#keyPart2
          */
         private final byte keyPart2;
-        
+
         /**
          * Mask used for shift calculation.
          * <br/>
-         * In dynamic shift mode, this mask is used in conjunction with the byte 
+         * In dynamic shift mode, this mask is used in conjunction with the byte
          * position to calculate the specific shift amount for each byte.
          *
          * @see FastBlurOptimized#shiftMask
@@ -721,7 +768,7 @@ public class FastBlurOptimized extends FastBlurBase {
         /**
          * Constructs an EncryptTask for a data segment.
          * <br/>
-         * Initializes a task to encrypt a segment of a byte array using the 
+         * Initializes a task to encrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data      the data array to process
@@ -743,7 +790,7 @@ public class FastBlurOptimized extends FastBlurBase {
         /**
          * Computes the encryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly, or splits 
+         * Processes data segments smaller than the threshold directly, or splits
          * larger segments into subtasks for parallel processing.
          *
          * <p>Algorithm:
@@ -790,8 +837,8 @@ public class FastBlurOptimized extends FastBlurBase {
     /**
      * Decryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles decryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles decryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -807,59 +854,59 @@ public class FastBlurOptimized extends FastBlurBase {
         /**
          * Task threshold: 16KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 16384; // 任务阈值：16KB
-        
+
         private static final long serialVersionUID = 4586245996695330434L;
-        
+
         /**
          * Data to be decrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * First key fragment for XOR operations.
          * <br/>
-         * The first part of a split-key approach where the key is divided 
-         * into multiple parts that are applied at different stages of the decryption 
+         * The first part of a split-key approach where the key is divided
+         * into multiple parts that are applied at different stages of the decryption
          * process.
          *
          * @see FastBlurOptimized#keyPart1
          */
         private final byte keyPart1;
-        
+
         /**
          * Second key fragment for XOR operations.
          * <br/>
-         * The second part of a split-key approach. In dynamic shift mode, 
+         * The second part of a split-key approach. In dynamic shift mode,
          * this is applied before the shift operation during decryption.
          *
          * @see FastBlurOptimized#keyPart2
          */
         private final byte keyPart2;
-        
+
         /**
          * Mask used for shift calculation.
          * <br/>
-         * In dynamic shift mode, this mask is used in conjunction with the byte 
+         * In dynamic shift mode, this mask is used in conjunction with the byte
          * position to calculate the specific shift amount for each byte.
          *
          * @see FastBlurOptimized#shiftMask
@@ -870,7 +917,7 @@ public class FastBlurOptimized extends FastBlurBase {
         /**
          * Constructs a DecryptTask for a data segment.
          * <br/>
-         * Initializes a task to decrypt a segment of a byte array using the 
+         * Initializes a task to decrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data      the data array to process
@@ -892,7 +939,7 @@ public class FastBlurOptimized extends FastBlurBase {
         /**
          * Computes the decryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly, or splits 
+         * Processes data segments smaller than the threshold directly, or splits
          * larger segments into subtasks for parallel processing.
          *
          * <p>Algorithm (Inverse of encryption):

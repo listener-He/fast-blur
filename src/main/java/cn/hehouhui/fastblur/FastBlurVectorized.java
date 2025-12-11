@@ -3,20 +3,19 @@ package cn.hehouhui.fastblur;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 
 /**
  * Simple lightweight obfuscation algorithm (vectorized version).
  * <br/>
- * High-performance reversible lightweight encryption tool (supports fixed shift and 
- * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift + 
+ * High-performance reversible lightweight encryption tool (supports fixed shift and
+ * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift +
  * XOR bitwise operations, extremely fast, reversible, obfuscation superior to fixed shift.
  *
- * <p>This class provides a simple data obfuscation mechanism that implements 
+ * <p>This class provides a simple data obfuscation mechanism that implements
  * reversible data transformation through dynamic shift and XOR operations.
- * Optimized with vectorized processing concepts, suitable for lightweight data 
+ * Optimized with vectorized processing concepts, suitable for lightweight data
  * protection scenarios requiring extreme performance.</p>
  *
  * <p>Vectorized optimizations:
@@ -28,8 +27,8 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * <p>Design Philosophy:
- * The vectorized approach focuses on processing multiple data elements in parallel 
- * to maximize throughput. This implementation uses techniques like batch processing 
+ * The vectorized approach focuses on processing multiple data elements in parallel
+ * to maximize throughput. This implementation uses techniques like batch processing
  * and loop unrolling to reduce overhead and improve performance.
  * </p>
  *
@@ -44,17 +43,17 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * @author HeHui
- * @since 1.0
  * @see FastBlurBase
  * @see FastBlurStrategy#VECTOR
+ * @since 1.0
  */
 public class FastBlurVectorized extends FastBlurBase {
 
     /**
      * Default constructor using UTF-8 character set encoding.
      * <br/>
-     * Initializes a FastBlurVectorized instance with UTF-8 encoding and default 
-     * configuration values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurVectorized instance with UTF-8 encoding and default
+     * configuration values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -72,8 +71,8 @@ public class FastBlurVectorized extends FastBlurBase {
     /**
      * Constructor initializing a FastBlurVectorized instance with the specified encoding.
      * <br/>
-     * Initializes a FastBlurVectorized instance with the given character encoding and 
-     * default key and shift values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurVectorized instance with the given character encoding and
+     * default key and shift values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -83,6 +82,7 @@ public class FastBlurVectorized extends FastBlurBase {
      * </p>
      *
      * @param encoding character encoding method
+     *
      * @see Charset
      */
     public FastBlurVectorized(Charset encoding) {
@@ -90,10 +90,10 @@ public class FastBlurVectorized extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurVectorized instance with the specified encoding, 
+     * Constructor initializing a FastBlurVectorized instance with the specified encoding,
      * key, and key segment (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurVectorized instance in dynamic shift mode with the given 
+     * Initializes a FastBlurVectorized instance in dynamic shift mode with the given
      * parameters. Parallel processing is disabled.
      *
      * <p>Usage example:
@@ -102,9 +102,10 @@ public class FastBlurVectorized extends FastBlurBase {
      * }</pre>
      * </p>
      *
-     * @param encoding    character encoding method
-     * @param key         64-bit key
-     * @param keySegment  key segment value for dynamic shift calculation
+     * @param encoding   character encoding method
+     * @param key        64-bit key
+     * @param keySegment key segment value for dynamic shift calculation
+     *
      * @see Charset
      */
     public FastBlurVectorized(Charset encoding, long key, byte keySegment) {
@@ -112,10 +113,10 @@ public class FastBlurVectorized extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurVectorized instance with the specified encoding, 
+     * Constructor initializing a FastBlurVectorized instance with the specified encoding,
      * key, key segment, and parallel processing option (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurVectorized instance in dynamic shift mode with the given 
+     * Initializes a FastBlurVectorized instance in dynamic shift mode with the given
      * parameters. Parallel processing can be enabled.
      *
      * <p>Usage example:
@@ -128,15 +129,16 @@ public class FastBlurVectorized extends FastBlurBase {
      * @param key                64-bit key
      * @param keySegment         key segment value for dynamic shift calculation
      * @param parallelProcessing whether to enable parallel processing
+     *
      * @see Charset
      * @see #parallelProcessing
      */
     public FastBlurVectorized(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
         this(encoding, key, keySegment, true, parallelProcessing);
     }
-    
+
     /**
-     * Constructor initializing a FastBlurVectorized instance with the specified encoding, 
+     * Constructor initializing a FastBlurVectorized instance with the specified encoding,
      * key, shift parameter, dynamic shift option, and parallel processing option.
      * <br/>
      * Fully configurable constructor for FastBlurVectorized instances.
@@ -146,16 +148,41 @@ public class FastBlurVectorized extends FastBlurBase {
      * @param shiftParam         key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
      * @param dynamicShift       whether to enable dynamic shift
      * @param parallelProcessing whether to enable parallel processing
+     *
      * @see Charset
      * @see #dynamicShift
      * @see #parallelProcessing
      */
     public FastBlurVectorized(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
         super(encoding, parallelProcessing, dynamicShift,
-              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
-              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
-              dynamicShift ? shiftParam & 0xFF : 0,
-              dynamicShift ? 0 : shiftParam & 0x7);
+            dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+            dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+            dynamicShift ? shiftParam & 0xFF : 0,
+            dynamicShift ? 0 : shiftParam & 0x7);
+    }
+
+    /**
+     * Constructor initializing a FastBlurVectorized instance with the specified encoding,
+     * key, shift parameter, dynamic shift option, and custom ForkJoinPool.
+     * <br/>
+     * Fully configurable constructor for FastBlurVectorized instances with custom ForkJoinPool.
+     *
+     * @param encoding     character encoding method
+     * @param key          64-bit key (dynamic shift) or key for XOR operations (fixed shift)
+     * @param shiftParam   key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
+     * @param dynamicShift whether to enable dynamic shift
+     * @param pool         custom ForkJoinPool for parallel processing
+     *
+     * @see Charset
+     * @see #dynamicShift
+     */
+    public FastBlurVectorized(Charset encoding, long key, int shiftParam, boolean dynamicShift, java.util.concurrent.ForkJoinPool pool) {
+        super(encoding, true, dynamicShift,
+            dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+            dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+            dynamicShift ? shiftParam & 0xFF : 0,
+            dynamicShift ? 0 : shiftParam & 0x7,
+            pool);
     }
 
     /**
@@ -168,7 +195,7 @@ public class FastBlurVectorized extends FastBlurBase {
      * 1. XOR data with first key fragment ({@link #keyPart1})
      * 2. Apply dynamic circular left shift based on byte position
      * 3. XOR result with second key fragment ({@link #keyPart2})
-     * 
+     * <p>
      * In fixed shift mode:
      * 1. XOR data with the key ({@link #keyPart1})
      * 2. Apply fixed circular left shift ({@link #shift})
@@ -188,7 +215,9 @@ public class FastBlurVectorized extends FastBlurBase {
      * </p>
      *
      * @param data the original byte array
+     *
      * @return the encrypted byte array (same array as input)
+     *
      * @throws IllegalArgumentException if the input data is malformed
      * @see #decrypt(byte[])
      * @see #dynamicShift
@@ -236,54 +265,54 @@ public class FastBlurVectorized extends FastBlurBase {
                 }
                 data[i] ^= kp2;
 
-                data[i+1] ^= kp1;
+                data[i + 1] ^= kp1;
                 if (s1 != 0) {
-                    final int u = data[i+1] & 0xFF;
-                    data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
+                    final int u = data[i + 1] & 0xFF;
+                    data[i + 1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
                 }
-                data[i+1] ^= kp2;
+                data[i + 1] ^= kp2;
 
-                data[i+2] ^= kp1;
+                data[i + 2] ^= kp1;
                 if (s2 != 0) {
-                    final int u = data[i+2] & 0xFF;
-                    data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
+                    final int u = data[i + 2] & 0xFF;
+                    data[i + 2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
                 }
-                data[i+2] ^= kp2;
+                data[i + 2] ^= kp2;
 
-                data[i+3] ^= kp1;
+                data[i + 3] ^= kp1;
                 if (s3 != 0) {
-                    final int u = data[i+3] & 0xFF;
-                    data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
+                    final int u = data[i + 3] & 0xFF;
+                    data[i + 3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
                 }
-                data[i+3] ^= kp2;
+                data[i + 3] ^= kp2;
 
-                data[i+4] ^= kp1;
+                data[i + 4] ^= kp1;
                 if (s4 != 0) {
-                    final int u = data[i+4] & 0xFF;
-                    data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
+                    final int u = data[i + 4] & 0xFF;
+                    data[i + 4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
                 }
-                data[i+4] ^= kp2;
+                data[i + 4] ^= kp2;
 
-                data[i+5] ^= kp1;
+                data[i + 5] ^= kp1;
                 if (s5 != 0) {
-                    final int u = data[i+5] & 0xFF;
-                    data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
+                    final int u = data[i + 5] & 0xFF;
+                    data[i + 5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
                 }
-                data[i+5] ^= kp2;
+                data[i + 5] ^= kp2;
 
-                data[i+6] ^= kp1;
+                data[i + 6] ^= kp1;
                 if (s6 != 0) {
-                    final int u = data[i+6] & 0xFF;
-                    data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
+                    final int u = data[i + 6] & 0xFF;
+                    data[i + 6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
                 }
-                data[i+6] ^= kp2;
+                data[i + 6] ^= kp2;
 
-                data[i+7] ^= kp1;
+                data[i + 7] ^= kp1;
                 if (s7 != 0) {
-                    final int u = data[i+7] & 0xFF;
-                    data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
+                    final int u = data[i + 7] & 0xFF;
+                    data[i + 7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
                 }
-                data[i+7] ^= kp2;
+                data[i + 7] ^= kp2;
             }
 
             // 处理剩余不足8个字节的数据
@@ -313,46 +342,46 @@ public class FastBlurVectorized extends FastBlurBase {
                     data[i] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+1] ^= kp1;
+                data[i + 1] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+1] & 0xFF;
-                    data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 1] & 0xFF;
+                    data[i + 1] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+2] ^= kp1;
+                data[i + 2] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+2] & 0xFF;
-                    data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 2] & 0xFF;
+                    data[i + 2] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+3] ^= kp1;
+                data[i + 3] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+3] & 0xFF;
-                    data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 3] & 0xFF;
+                    data[i + 3] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+4] ^= kp1;
+                data[i + 4] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+4] & 0xFF;
-                    data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 4] & 0xFF;
+                    data[i + 4] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+5] ^= kp1;
+                data[i + 5] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+5] & 0xFF;
-                    data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 5] & 0xFF;
+                    data[i + 5] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+6] ^= kp1;
+                data[i + 6] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+6] & 0xFF;
-                    data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 6] & 0xFF;
+                    data[i + 6] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
-                data[i+7] ^= kp1;
+                data[i + 7] ^= kp1;
                 if (sh != 0) {
-                    final int u = data[i+7] & 0xFF;
-                    data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
+                    final int u = data[i + 7] & 0xFF;
+                    data[i + 7] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
             }
 
@@ -379,7 +408,7 @@ public class FastBlurVectorized extends FastBlurBase {
      * 1. XOR data with second key fragment ({@link #keyPart2})
      * 2. Apply dynamic circular right shift based on byte position
      * 3. XOR result with first key fragment ({@link #keyPart1})
-     * 
+     * <p>
      * In fixed shift mode:
      * 1. Apply fixed circular right shift ({@link #shift})
      * 2. XOR data with the key ({@link #keyPart1})
@@ -400,7 +429,9 @@ public class FastBlurVectorized extends FastBlurBase {
      * </p>
      *
      * @param encryptedData the encrypted byte array
+     *
      * @return the original byte array (same array as input)
+     *
      * @throws IllegalArgumentException if the input data is malformed
      * @see #encrypt(byte[])
      * @see #dynamicShift
@@ -446,54 +477,54 @@ public class FastBlurVectorized extends FastBlurBase {
             }
             encryptedData[i] ^= kp1;
 
-            encryptedData[i+1] ^= kp2;
+            encryptedData[i + 1] ^= kp2;
             if (s1 != 0) {
-                final int u = encryptedData[i+1] & 0xFF;
-                encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
+                final int u = encryptedData[i + 1] & 0xFF;
+                encryptedData[i + 1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
             }
-            encryptedData[i+1] ^= kp1;
+            encryptedData[i + 1] ^= kp1;
 
-            encryptedData[i+2] ^= kp2;
+            encryptedData[i + 2] ^= kp2;
             if (s2 != 0) {
-                final int u = encryptedData[i+2] & 0xFF;
-                encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
+                final int u = encryptedData[i + 2] & 0xFF;
+                encryptedData[i + 2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
             }
-            encryptedData[i+2] ^= kp1;
+            encryptedData[i + 2] ^= kp1;
 
-            encryptedData[i+3] ^= kp2;
+            encryptedData[i + 3] ^= kp2;
             if (s3 != 0) {
-                final int u = encryptedData[i+3] & 0xFF;
-                encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
+                final int u = encryptedData[i + 3] & 0xFF;
+                encryptedData[i + 3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
             }
-            encryptedData[i+3] ^= kp1;
+            encryptedData[i + 3] ^= kp1;
 
-            encryptedData[i+4] ^= kp2;
+            encryptedData[i + 4] ^= kp2;
             if (s4 != 0) {
-                final int u = encryptedData[i+4] & 0xFF;
-                encryptedData[i+4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
+                final int u = encryptedData[i + 4] & 0xFF;
+                encryptedData[i + 4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
             }
-            encryptedData[i+4] ^= kp1;
+            encryptedData[i + 4] ^= kp1;
 
-            encryptedData[i+5] ^= kp2;
+            encryptedData[i + 5] ^= kp2;
             if (s5 != 0) {
-                final int u = encryptedData[i+5] & 0xFF;
-                encryptedData[i+5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
+                final int u = encryptedData[i + 5] & 0xFF;
+                encryptedData[i + 5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
             }
-            encryptedData[i+5] ^= kp1;
+            encryptedData[i + 5] ^= kp1;
 
-            encryptedData[i+6] ^= kp2;
+            encryptedData[i + 6] ^= kp2;
             if (s6 != 0) {
-                final int u = encryptedData[i+6] & 0xFF;
-                encryptedData[i+6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
+                final int u = encryptedData[i + 6] & 0xFF;
+                encryptedData[i + 6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
             }
-            encryptedData[i+6] ^= kp1;
+            encryptedData[i + 6] ^= kp1;
 
-            encryptedData[i+7] ^= kp2;
+            encryptedData[i + 7] ^= kp2;
             if (s7 != 0) {
-                final int u = encryptedData[i+7] & 0xFF;
-                encryptedData[i+7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
+                final int u = encryptedData[i + 7] & 0xFF;
+                encryptedData[i + 7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
             }
-            encryptedData[i+7] ^= kp1;
+            encryptedData[i + 7] ^= kp1;
         }
 
         // 处理剩余不足8个字节的数据
@@ -516,15 +547,17 @@ public class FastBlurVectorized extends FastBlurBase {
      * Operates directly on the ByteBuffer to avoid additional memory allocation.
      *
      * <p>Implementation:
-     * This implementation falls back to the regular encryption method. Subclasses 
-     * that can work directly with ByteBuffers should override this method for 
+     * This implementation falls back to the regular encryption method. Subclasses
+     * that can work directly with ByteBuffers should override this method for
      * improved performance.
      * </p>
      *
      * @param buffer the direct buffer containing the original data
      * @param offset the data offset
      * @param length the data length
+     *
      * @return execution result, true for success, false for failure
+     *
      * @see #encrypt(ByteBuffer, int, int)
      * @see ByteBuffer#isDirect()
      */
@@ -540,15 +573,17 @@ public class FastBlurVectorized extends FastBlurBase {
      * Operates directly on the ByteBuffer to avoid additional memory allocation.
      *
      * <p>Implementation:
-     * This implementation falls back to the regular decryption method. Subclasses 
-     * that can work directly with ByteBuffers should override this method for 
+     * This implementation falls back to the regular decryption method. Subclasses
+     * that can work directly with ByteBuffers should override this method for
      * improved performance.
      * </p>
      *
      * @param buffer the direct buffer containing the encrypted data
      * @param offset the data offset
      * @param length the data length
+     *
      * @return execution result, true for success, false for failure
+     *
      * @see #decrypt(ByteBuffer, int, int)
      * @see ByteBuffer#isDirect()
      */
@@ -575,12 +610,31 @@ public class FastBlurVectorized extends FastBlurBase {
      * </p>
      *
      * @param data the original byte array
+     *
      * @return the encrypted byte array
+     *
      * @see #encrypt(byte[])
      * @see EncryptTask
      * @see ForkJoinPool#commonPool()
      */
     public byte[] encryptParallel(byte[] data) {
+        return encryptParallel(data, customPool);
+    }
+
+    /**
+     * Parallel encryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param data the original byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     *
+     * @return the encrypted byte array
+     *
+     * @see #encrypt(byte[])
+     * @see EncryptTask
+     */
+    public byte[] encryptParallel(byte[] data, java.util.concurrent.ForkJoinPool pool) {
         if (data == null || data.length == 0) {
             return data;
         }
@@ -589,9 +643,8 @@ public class FastBlurVectorized extends FastBlurBase {
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
 
         return dataCopy;
     }
@@ -613,12 +666,31 @@ public class FastBlurVectorized extends FastBlurBase {
      * </p>
      *
      * @param encryptedData the encrypted byte array
+     *
      * @return the original byte array
+     *
      * @see #decrypt(byte[])
      * @see DecryptTask
      * @see ForkJoinPool#commonPool()
      */
     public byte[] decryptParallel(byte[] encryptedData) {
+        return decryptParallel(encryptedData, customPool);
+    }
+
+    /**
+     * Parallel decryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param encryptedData the encrypted byte array
+     * @param pool          the ForkJoinPool to use for parallel processing
+     *
+     * @return the original byte array
+     *
+     * @see #decrypt(byte[])
+     * @see DecryptTask
+     */
+    public byte[] decryptParallel(byte[] encryptedData, java.util.concurrent.ForkJoinPool pool) {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
@@ -627,9 +699,8 @@ public class FastBlurVectorized extends FastBlurBase {
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask));
 
         return dataCopy;
     }
@@ -637,8 +708,8 @@ public class FastBlurVectorized extends FastBlurBase {
     /**
      * Encryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles encryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles encryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -654,60 +725,60 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Task threshold: 4KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 4096; // 任务阈值：4KB
-        
+
         private static final long serialVersionUID = -1134508474606636622L;
-        
+
         /**
          * Data to be encrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * First key fragment for XOR operations.
          * <br/>
-         * The first part of a split-key approach where the key is divided 
-         * into multiple parts that are applied at different stages of the encryption 
+         * The first part of a split-key approach where the key is divided
+         * into multiple parts that are applied at different stages of the encryption
          * process.
          *
          * @see FastBlurVectorized#keyPart1
          */
         private final byte keyPart1;
-        
+
         /**
          * Second key fragment for XOR operations.
          * <br/>
-         * The second part of a split-key approach. In dynamic shift mode, 
-         * this is applied after the shift operation, providing a form of double 
+         * The second part of a split-key approach. In dynamic shift mode,
+         * this is applied after the shift operation, providing a form of double
          * encryption for each byte.
          *
          * @see FastBlurVectorized#keyPart2
          */
         private final byte keyPart2;
-        
+
         /**
          * Mask used for shift calculation.
          * <br/>
-         * In dynamic shift mode, this mask is used in conjunction with the byte 
+         * In dynamic shift mode, this mask is used in conjunction with the byte
          * position to calculate the specific shift amount for each byte.
          *
          * @see FastBlurVectorized#shiftMask
@@ -718,7 +789,7 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Constructs an EncryptTask for a data segment.
          * <br/>
-         * Initializes a task to encrypt a segment of a byte array using the 
+         * Initializes a task to encrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data      the data array to process
@@ -740,16 +811,16 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Computes the encryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly using a 
+         * Processes data segments smaller than the threshold directly using a
          * vectorized approach, or splits larger segments into subtasks for parallel processing.
          *
          * <p>Vectorized Algorithm:
          * For each group of 8 bytes in the segment:
          * 1. Pre-calculate shift values for all 8 bytes
          * 2. For each byte:
-         *    a. XOR with first key fragment
-         *    b. Apply dynamic circular left shift if shift != 0
-         *    c. XOR with second key fragment
+         * a. XOR with first key fragment
+         * b. Apply dynamic circular left shift if shift != 0
+         * c. XOR with second key fragment
          * </p>
          *
          * @see RecursiveAction#compute()
@@ -786,54 +857,54 @@ public class FastBlurVectorized extends FastBlurBase {
                     }
                     data[i] ^= kp2;
 
-                    data[i+1] ^= kp1;
+                    data[i + 1] ^= kp1;
                     if (s1 != 0) {
-                        final int u = data[i+1] & 0xFF;
-                        data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
+                        final int u = data[i + 1] & 0xFF;
+                        data[i + 1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
                     }
-                    data[i+1] ^= kp2;
+                    data[i + 1] ^= kp2;
 
-                    data[i+2] ^= kp1;
+                    data[i + 2] ^= kp1;
                     if (s2 != 0) {
-                        final int u = data[i+2] & 0xFF;
-                        data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
+                        final int u = data[i + 2] & 0xFF;
+                        data[i + 2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
                     }
-                    data[i+2] ^= kp2;
+                    data[i + 2] ^= kp2;
 
-                    data[i+3] ^= kp1;
+                    data[i + 3] ^= kp1;
                     if (s3 != 0) {
-                        final int u = data[i+3] & 0xFF;
-                        data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
+                        final int u = data[i + 3] & 0xFF;
+                        data[i + 3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
                     }
-                    data[i+3] ^= kp2;
+                    data[i + 3] ^= kp2;
 
-                    data[i+4] ^= kp1;
+                    data[i + 4] ^= kp1;
                     if (s4 != 0) {
-                        final int u = data[i+4] & 0xFF;
-                        data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
+                        final int u = data[i + 4] & 0xFF;
+                        data[i + 4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
                     }
-                    data[i+4] ^= kp2;
+                    data[i + 4] ^= kp2;
 
-                    data[i+5] ^= kp1;
+                    data[i + 5] ^= kp1;
                     if (s5 != 0) {
-                        final int u = data[i+5] & 0xFF;
-                        data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
+                        final int u = data[i + 5] & 0xFF;
+                        data[i + 5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
                     }
-                    data[i+5] ^= kp2;
+                    data[i + 5] ^= kp2;
 
-                    data[i+6] ^= kp1;
+                    data[i + 6] ^= kp1;
                     if (s6 != 0) {
-                        final int u = data[i+6] & 0xFF;
-                        data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
+                        final int u = data[i + 6] & 0xFF;
+                        data[i + 6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
                     }
-                    data[i+6] ^= kp2;
+                    data[i + 6] ^= kp2;
 
-                    data[i+7] ^= kp1;
+                    data[i + 7] ^= kp1;
                     if (s7 != 0) {
-                        final int u = data[i+7] & 0xFF;
-                        data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
+                        final int u = data[i + 7] & 0xFF;
+                        data[i + 7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
                     }
-                    data[i+7] ^= kp2;
+                    data[i + 7] ^= kp2;
                 }
 
                 // 处理剩余不足8个字节的数据
@@ -859,8 +930,8 @@ public class FastBlurVectorized extends FastBlurBase {
     /**
      * Decryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles decryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles decryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -876,59 +947,59 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Task threshold: 4KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 4096; // 任务阈值：4KB
-        
+
         private static final long serialVersionUID = 6527346346469821233L;
-        
+
         /**
          * Data to be decrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * First key fragment for XOR operations.
          * <br/>
-         * The first part of a split-key approach where the key is divided 
-         * into multiple parts that are applied at different stages of the decryption 
+         * The first part of a split-key approach where the key is divided
+         * into multiple parts that are applied at different stages of the decryption
          * process.
          *
          * @see FastBlurVectorized#keyPart1
          */
         private final byte keyPart1;
-        
+
         /**
          * Second key fragment for XOR operations.
          * <br/>
-         * The second part of a split-key approach. In dynamic shift mode, 
+         * The second part of a split-key approach. In dynamic shift mode,
          * this is applied before the shift operation during decryption.
          *
          * @see FastBlurVectorized#keyPart2
          */
         private final byte keyPart2;
-        
+
         /**
          * Mask used for shift calculation.
          * <br/>
-         * In dynamic shift mode, this mask is used in conjunction with the byte 
+         * In dynamic shift mode, this mask is used in conjunction with the byte
          * position to calculate the specific shift amount for each byte.
          *
          * @see FastBlurVectorized#shiftMask
@@ -939,7 +1010,7 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Constructs a DecryptTask for a data segment.
          * <br/>
-         * Initializes a task to decrypt a segment of a byte array using the 
+         * Initializes a task to decrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data      the data array to process
@@ -961,16 +1032,16 @@ public class FastBlurVectorized extends FastBlurBase {
         /**
          * Computes the decryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly using a 
+         * Processes data segments smaller than the threshold directly using a
          * vectorized approach, or splits larger segments into subtasks for parallel processing.
          *
          * <p>Vectorized Algorithm (Inverse of encryption):
          * For each group of 8 bytes in the segment:
          * 1. Pre-calculate shift values for all 8 bytes
          * 2. For each byte:
-         *    a. XOR with second key fragment
-         *    b. Apply dynamic circular right shift if shift != 0
-         *    c. XOR with first key fragment
+         * a. XOR with second key fragment
+         * b. Apply dynamic circular right shift if shift != 0
+         * c. XOR with first key fragment
          * </p>
          *
          * <p>Note: Operations are performed in reverse order compared to encryption.
@@ -1010,54 +1081,54 @@ public class FastBlurVectorized extends FastBlurBase {
                     }
                     data[i] ^= kp1;
 
-                    data[i+1] ^= kp2;
+                    data[i + 1] ^= kp2;
                     if (s1 != 0) {
-                        final int u = data[i+1] & 0xFF;
-                        data[i+1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
+                        final int u = data[i + 1] & 0xFF;
+                        data[i + 1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
                     }
-                    data[i+1] ^= kp1;
+                    data[i + 1] ^= kp1;
 
-                    data[i+2] ^= kp2;
+                    data[i + 2] ^= kp2;
                     if (s2 != 0) {
-                        final int u = data[i+2] & 0xFF;
-                        data[i+2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
+                        final int u = data[i + 2] & 0xFF;
+                        data[i + 2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
                     }
-                    data[i+2] ^= kp1;
+                    data[i + 2] ^= kp1;
 
-                    data[i+3] ^= kp2;
+                    data[i + 3] ^= kp2;
                     if (s3 != 0) {
-                        final int u = data[i+3] & 0xFF;
-                        data[i+3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
+                        final int u = data[i + 3] & 0xFF;
+                        data[i + 3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
                     }
-                    data[i+3] ^= kp1;
+                    data[i + 3] ^= kp1;
 
-                    data[i+4] ^= kp2;
+                    data[i + 4] ^= kp2;
                     if (s4 != 0) {
-                        final int u = data[i+4] & 0xFF;
-                        data[i+4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
+                        final int u = data[i + 4] & 0xFF;
+                        data[i + 4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
                     }
-                    data[i+4] ^= kp1;
+                    data[i + 4] ^= kp1;
 
-                    data[i+5] ^= kp2;
+                    data[i + 5] ^= kp2;
                     if (s5 != 0) {
-                        final int u = data[i+5] & 0xFF;
-                        data[i+5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
+                        final int u = data[i + 5] & 0xFF;
+                        data[i + 5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
                     }
-                    data[i+5] ^= kp1;
+                    data[i + 5] ^= kp1;
 
-                    data[i+6] ^= kp2;
+                    data[i + 6] ^= kp2;
                     if (s6 != 0) {
-                        final int u = data[i+6] & 0xFF;
-                        data[i+6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
+                        final int u = data[i + 6] & 0xFF;
+                        data[i + 6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
                     }
-                    data[i+6] ^= kp1;
+                    data[i + 6] ^= kp1;
 
-                    data[i+7] ^= kp2;
+                    data[i + 7] ^= kp2;
                     if (s7 != 0) {
-                        final int u = data[i+7] & 0xFF;
-                        data[i+7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
+                        final int u = data[i + 7] & 0xFF;
+                        data[i + 7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
                     }
-                    data[i+7] ^= kp1;
+                    data[i + 7] ^= kp1;
                 }
 
                 // 处理剩余不足8个字节的数据

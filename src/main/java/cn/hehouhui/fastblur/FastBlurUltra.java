@@ -10,13 +10,13 @@ import java.util.concurrent.RecursiveAction;
 /**
  * Simple lightweight obfuscation algorithm (ultra version).
  * <br/>
- * High-performance reversible lightweight encryption tool (supports fixed shift and 
- * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift + 
+ * High-performance reversible lightweight encryption tool (supports fixed shift and
+ * dynamic shift enhanced obfuscation, security not guaranteed). Core: dynamic shift +
  * XOR bitwise operations, extremely fast, reversible, obfuscation superior to fixed shift.
  *
- * <p>This class provides a simple data obfuscation mechanism that implements 
+ * <p>This class provides a simple data obfuscation mechanism that implements
  * reversible data transformation through dynamic shift and XOR operations.
- * Compared to ordinary versions, extreme performance optimizations have been made, 
+ * Compared to ordinary versions, extreme performance optimizations have been made,
  * suitable for lightweight data protection scenarios requiring extreme performance.</p>
  *
  * <p>Extreme optimizations:
@@ -29,9 +29,9 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * <p>Design Philosophy:
- * The ultra version represents the pinnacle of performance optimization for the 
- * FastBlur algorithm. It trades memory for speed by pre-computing lookup tables, 
- * making it ideal for scenarios where maximum throughput is required regardless 
+ * The ultra version represents the pinnacle of performance optimization for the
+ * FastBlur algorithm. It trades memory for speed by pre-computing lookup tables,
+ * making it ideal for scenarios where maximum throughput is required regardless
  * of memory constraints.
  * </p>
  *
@@ -55,8 +55,8 @@ public class FastBlurUltra extends FastBlurBase {
     /**
      * Left circular shift lookup table.
      * <br/>
-     * Pre-computed lookup table for left circular shifts. Indexed by shift amount 
-     * (0-7) and byte value (0-255). This table eliminates the need for runtime 
+     * Pre-computed lookup table for left circular shifts. Indexed by shift amount
+     * (0-7) and byte value (0-255). This table eliminates the need for runtime
      * bitwise operations, trading memory for speed.
      *
      * <p>Structure:
@@ -73,8 +73,8 @@ public class FastBlurUltra extends FastBlurBase {
     /**
      * Right circular shift lookup table.
      * <br/>
-     * Pre-computed lookup table for right circular shifts. Indexed by shift amount 
-     * (0-7) and byte value (0-255). This table eliminates the need for runtime 
+     * Pre-computed lookup table for right circular shifts. Indexed by shift amount
+     * (0-7) and byte value (0-255). This table eliminates the need for runtime
      * bitwise operations, trading memory for speed.
      *
      * <p>Structure:
@@ -91,8 +91,8 @@ public class FastBlurUltra extends FastBlurBase {
     /**
      * Default constructor using UTF-8 character set encoding.
      * <br/>
-     * Initializes a FastBlurUltra instance with UTF-8 encoding and default 
-     * configuration values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurUltra instance with UTF-8 encoding and default
+     * configuration values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -110,8 +110,8 @@ public class FastBlurUltra extends FastBlurBase {
     /**
      * Constructor initializing a FastBlurUltra instance with the specified encoding.
      * <br/>
-     * Initializes a FastBlurUltra instance with the given character encoding and 
-     * default key and shift values. Dynamic shifting is enabled and parallel processing 
+     * Initializes a FastBlurUltra instance with the given character encoding and
+     * default key and shift values. Dynamic shifting is enabled and parallel processing
      * is disabled.
      *
      * <p>Usage example:
@@ -128,10 +128,10 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * Constructor initializing a FastBlurUltra instance with the specified encoding,
      * key, and key segment (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurUltra instance in dynamic shift mode with the given 
+     * Initializes a FastBlurUltra instance in dynamic shift mode with the given
      * parameters. Parallel processing is disabled.
      *
      * <p>Usage example:
@@ -150,10 +150,10 @@ public class FastBlurUltra extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * Constructor initializing a FastBlurUltra instance with the specified encoding,
      * key, key segment, and parallel processing option (dynamic shift mode).
      * <br/>
-     * Initializes a FastBlurUltra instance in dynamic shift mode with the given 
+     * Initializes a FastBlurUltra instance in dynamic shift mode with the given
      * parameters. Parallel processing can be enabled.
      *
      * <p>Usage example:
@@ -170,17 +170,17 @@ public class FastBlurUltra extends FastBlurBase {
      * @see #parallelProcessing
      */
     public FastBlurUltra(Charset encoding, long key, byte keySegment, boolean parallelProcessing) {
-        this(encoding, key, keySegment, true, parallelProcessing);
+        this(encoding, key, keySegment, true, parallelProcessing, null);
     }
-    
+
     /**
-     * Constructor initializing a FastBlurUltra instance with the specified encoding, 
+     * Constructor initializing a FastBlurUltra instance with the specified encoding,
      * key, shift parameter, dynamic shift option, and parallel processing option.
      * <br/>
      * Fully configurable constructor for FastBlurUltra instances.
      *
      * <p>Lookup Table Initialization:
-     * In dynamic shift mode, pre-computes lookup tables for all possible shift 
+     * In dynamic shift mode, pre-computes lookup tables for all possible shift
      * operations to eliminate runtime bitwise computations.
      * </p>
      *
@@ -195,13 +195,54 @@ public class FastBlurUltra extends FastBlurBase {
      * @see #leftShiftTable
      * @see #rightShiftTable
      */
-    public FastBlurUltra(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
+    public FastBlurUltra(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing, java.util.concurrent.ForkJoinPool customPool) {
         super(encoding, parallelProcessing, dynamicShift,
               dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
               dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
               dynamicShift ? shiftParam & 0xFF : 0,
-              dynamicShift ? 0 : shiftParam & 0x7);
-              
+              dynamicShift ? 0 : shiftParam & 0x7, customPool);
+
+        // 预计算查找表（仅在动态位移模式下需要）
+        if (dynamicShift) {
+            this.leftShiftTable = new byte[8][256];
+            this.rightShiftTable = new byte[8][256];
+
+            for (int shift = 0; shift < 8; shift++) {
+                for (int b = 0; b < 256; b++) {
+                    // 左循环位移
+                    leftShiftTable[shift][b] = (byte) (FastBlurUtils.rotateLeft(b, shift) & 0xFF);
+                    // 右循环位移
+                    rightShiftTable[shift][b] = (byte) (FastBlurUtils.rotateRight(b, shift) & 0xFF);
+                }
+            }
+        } else {
+            this.leftShiftTable = null;
+            this.rightShiftTable = null;
+        }
+    }
+
+    /**
+     * Constructor initializing a FastBlurUltra instance with the specified encoding,
+     * key, shift parameter, dynamic shift option, and custom ForkJoinPool.
+     * <br/>
+     * Fully configurable constructor for FastBlurUltra instances with custom ForkJoinPool.
+     *
+     * @param encoding           character encoding method
+     * @param key                64-bit key (dynamic shift) or key for XOR operations (fixed shift)
+     * @param shiftParam         key segment value (dynamic shift) or fixed shift value (fixed shift, 0-7)
+     * @param dynamicShift       whether to enable dynamic shift
+     * @param pool               custom ForkJoinPool for parallel processing
+     * @see Charset
+     * @see #dynamicShift
+     */
+    public FastBlurUltra(Charset encoding, long key, int shiftParam, boolean dynamicShift, java.util.concurrent.ForkJoinPool pool) {
+        super(encoding, true, dynamicShift,
+              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+              dynamicShift ? shiftParam & 0xFF : 0,
+              dynamicShift ? 0 : shiftParam & 0x7,
+              pool);
+
         // 预计算查找表（仅在动态位移模式下需要）
         if (dynamicShift) {
             this.leftShiftTable = new byte[8][256];
@@ -229,7 +270,7 @@ public class FastBlurUltra extends FastBlurBase {
      * 1. XOR the data with the first part of the key
      * 2. Perform dynamic circular left shift on the result
      * 3. XOR the result with the second part of the key
-     * 
+     *
      * Fixed shift mode:
      * 1. XOR the data with the key
      * 2. Perform fixed circular left shift on the result
@@ -239,7 +280,7 @@ public class FastBlurUltra extends FastBlurBase {
      * 1. XOR data with first key fragment ({@link #keyPart1})
      * 2. Apply dynamic circular left shift using lookup table ({@link #leftShiftTable})
      * 3. XOR result with second key fragment ({@link #keyPart2})
-     * 
+     *
      * In fixed shift mode:
      * 1. XOR data with the key ({@link #keyPart1})
      * 2. Apply fixed circular left shift ({@link #shift})
@@ -317,7 +358,7 @@ public class FastBlurUltra extends FastBlurBase {
             for (int i = 0; i < data.length; i++) {
                 // 步骤1：密钥异或
                 data[i] ^= keyPart1;
-                
+
                 // 步骤2：固定循环左移
                 if (shift != 0) {
                     int unsigned = data[i] & 0xFF;
@@ -328,7 +369,7 @@ public class FastBlurUltra extends FastBlurBase {
         }
         return data;
     }
-    
+
     /**
      * Unrolled loop encryption method for small data (fixed shift mode).
      * <br/>
@@ -352,7 +393,7 @@ public class FastBlurUltra extends FastBlurBase {
         final int len = data.length;
         final byte kp1 = keyPart1;
         final int sh = shift;
-        
+
         // 展开循环以减少分支开销
         int i = 0;
         for (; i <= len - 8; i += 8) {
@@ -362,50 +403,50 @@ public class FastBlurUltra extends FastBlurBase {
                 int unsigned = data[i] & 0xFF;
                 data[i] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+1] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+1] & 0xFF;
                 data[i+1] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+2] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+2] & 0xFF;
                 data[i+2] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+3] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+3] & 0xFF;
                 data[i+3] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+4] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+4] & 0xFF;
                 data[i+4] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+5] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+5] & 0xFF;
                 data[i+5] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+6] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+6] & 0xFF;
                 data[i+6] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
-            
+
             data[i+7] ^= kp1;
             if (sh != 0) {
                 int unsigned = data[i+7] & 0xFF;
                 data[i+7] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
         }
-        
+
         // 处理剩余字节
         for (; i < len; i++) {
             data[i] ^= kp1;
@@ -414,7 +455,7 @@ public class FastBlurUltra extends FastBlurBase {
                 data[i] = (byte) (FastBlurUtils.rotateLeft(unsigned, sh) & 0xFF);
             }
         }
-        
+
         return data;
     }
 
@@ -452,12 +493,12 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         final int len = data.length;
-        
+
         // 对于大于64字节的数据，使用批量处理
         if (len > 64) {
             return encryptSmallBatch(data);
         }
-        
+
         // 展开小循环以减少分支开销
         switch (len) {
             case 8:
@@ -514,7 +555,7 @@ public class FastBlurUltra extends FastBlurBase {
         final byte kp1 = keyPart1;
         final byte kp2 = keyPart2;
         final int mask = shiftMask;
-        
+
         // 批量处理以减少函数调用开销
         for (int i = 0; i < len; i++) {
             int dynamicShift = FastBlurUtils.getDynamicShift(i, mask);
@@ -523,7 +564,7 @@ public class FastBlurUltra extends FastBlurBase {
             int shifted = leftShiftTable[dynamicShift][xored1] & 0xFF;
             data[i] = (byte) (shifted ^ (kp2 & 0xFF));
         }
-        
+
         return data;
     }
 
@@ -593,7 +634,7 @@ public class FastBlurUltra extends FastBlurBase {
             for (int i = 0; i < encryptedData.length; i++) {
                 // 步骤1：密钥异或
                 encryptedData[i] ^= keyPart1;
-                
+
                 // 步骤2：固定循环右移
                 if (shift != 0) {
                     int unsigned = encryptedData[i] & 0xFF;
@@ -604,7 +645,7 @@ public class FastBlurUltra extends FastBlurBase {
         }
         return encryptedData;
     }
-    
+
     /**
      * 展开循环的小数据解密方法（固定位移模式）
      * 专门针对小于等于128字节的数据进行优化
@@ -616,7 +657,7 @@ public class FastBlurUltra extends FastBlurBase {
         final int len = encryptedData.length;
         final byte kp1 = keyPart1;
         final int sh = shift;
-        
+
         // 展开循环以减少分支开销
         int i = 0;
         for (; i <= len - 8; i += 8) {
@@ -626,50 +667,50 @@ public class FastBlurUltra extends FastBlurBase {
                 int unsigned = encryptedData[i] & 0xFF;
                 encryptedData[i] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+1] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+1] & 0xFF;
                 encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+2] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+2] & 0xFF;
                 encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+3] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+3] & 0xFF;
                 encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+4] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+4] & 0xFF;
                 encryptedData[i+4] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+5] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+5] & 0xFF;
                 encryptedData[i+5] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+6] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+6] & 0xFF;
                 encryptedData[i+6] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
-            
+
             encryptedData[i+7] ^= kp1;
             if (sh != 0) {
                 int unsigned = encryptedData[i+7] & 0xFF;
                 encryptedData[i+7] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
         }
-        
+
         // 处理剩余字节
         for (; i < len; i++) {
             encryptedData[i] ^= kp1;
@@ -678,7 +719,7 @@ public class FastBlurUltra extends FastBlurBase {
                 encryptedData[i] = (byte) (FastBlurUtils.rotateRight(unsigned, sh) & 0xFF);
             }
         }
-        
+
         return encryptedData;
     }
 
@@ -695,12 +736,12 @@ public class FastBlurUltra extends FastBlurBase {
         }
 
         final int len = encryptedData.length;
-        
+
         // 对于大于64字节的数据，使用批量处理
         if (len > 64) {
             return decryptSmallBatch(encryptedData);
         }
-        
+
         // 展开小循环以减少分支开销
         switch (len) {
             case 8:
@@ -738,7 +779,7 @@ public class FastBlurUltra extends FastBlurBase {
         final byte kp1 = keyPart1;
         final byte kp2 = keyPart2;
         final int mask = shiftMask;
-        
+
         // 批量处理以减少函数调用开销
         for (int i = 0; i < len; i++) {
             int dynamicShift = FastBlurUtils.getDynamicShift(i, mask);
@@ -747,7 +788,7 @@ public class FastBlurUltra extends FastBlurBase {
             int shifted = rightShiftTable[dynamicShift][xored1] & 0xFF;
             encryptedData[i] = (byte) (shifted ^ (kp1 & 0xFF));
         }
-        
+
         return encryptedData;
     }
 
@@ -790,6 +831,21 @@ public class FastBlurUltra extends FastBlurBase {
      * @return 加密后字节数组
      */
     public byte[] encryptParallel(byte[] data) {
+        return encryptParallel(data, customPool);
+    }
+
+    /**
+     * Parallel encryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param data the original byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     * @return the encrypted byte array
+     * @see #encrypt(byte[])
+     * @see EncryptTask
+     */
+    public byte[] encryptParallel(byte[] data, java.util.concurrent.ForkJoinPool pool) {
         if (data == null || data.length == 0) {
             return data;
         }
@@ -798,9 +854,8 @@ public class FastBlurUltra extends FastBlurBase {
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
 
         return dataCopy;
     }
@@ -814,6 +869,21 @@ public class FastBlurUltra extends FastBlurBase {
      * @return 原始字节数组
      */
     public byte[] decryptParallel(byte[] encryptedData) {
+        return decryptParallel(encryptedData, customPool);
+    }
+
+    /**
+     * Parallel decryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param encryptedData the encrypted byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     * @return the original byte array
+     * @see #decrypt(byte[])
+     * @see DecryptTask
+     */
+    public byte[] decryptParallel(byte[] encryptedData, java.util.concurrent.ForkJoinPool pool) {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
@@ -822,9 +892,8 @@ public class FastBlurUltra extends FastBlurBase {
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
 
-        // 使用ForkJoin框架进行并行处理
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool.commonPool().invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
+        // 使用指定的ForkJoin框架进行并行处理
+        pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, keyPart2, shiftMask, leftShiftTable, rightShiftTable));
 
         return dataCopy;
     }

@@ -10,16 +10,16 @@ import java.util.concurrent.RecursiveAction;
 /**
  * Simple lightweight obfuscation algorithm (simplified version).
  * <br/>
- * High-performance reversible lightweight encryption tool (supports fixed shift and 
+ * High-performance reversible lightweight encryption tool (supports fixed shift and
  * dynamic shift enhanced obfuscation, security not guaranteed). Core: fixed shift/
- * dynamic shift + XOR bitwise operations, extremely fast, reversible, obfuscation 
+ * dynamic shift + XOR bitwise operations, extremely fast, reversible, obfuscation
  * superior to fixed shift.
- * 
- * <p>This class provides a simple data obfuscation mechanism that implements 
- * reversible data transformation through fixed shift/dynamic shift and XOR operations. 
- * Compared to complex versions, the algorithm has been simplified for lightweight 
+ *
+ * <p>This class provides a simple data obfuscation mechanism that implements
+ * reversible data transformation through fixed shift/dynamic shift and XOR operations.
+ * Compared to complex versions, the algorithm has been simplified for lightweight
  * data protection scenarios requiring extreme performance.</p>
- * 
+ *
  * <p>Simplification optimizations:
  * 1. Supports both fixed shift and dynamic shift modes
  * 2. Reduces encryption steps, performing only one XOR and one shift operation
@@ -27,8 +27,8 @@ import java.util.concurrent.RecursiveAction;
  * </p>
  *
  * <p>Design Philosophy:
- * FastBlurSimple is designed for scenarios where maximum performance is needed 
- * with minimal computational overhead. It trades some obfuscation strength for 
+ * FastBlurSimple is designed for scenarios where maximum performance is needed
+ * with minimal computational overhead. It trades some obfuscation strength for
  * speed by reducing the number of transformation steps.
  * </p>
  *
@@ -49,12 +49,13 @@ import java.util.concurrent.RecursiveAction;
  */
 public class FastBlurSimple extends FastBlurBase {
 
+
     /**
      * Default constructor using UTF-8 character set encoding.
      * <br/>
-     * Initializes a FastBlurSimple instance with UTF-8 encoding and default 
+     * Initializes a FastBlurSimple instance with UTF-8 encoding and default
      * configuration values. Both dynamic shifting and parallel processing are disabled.
-     * 
+     *
      * <p>Usage example:
      * <pre>{@code
      * FastBlurSimple blur = new FastBlurSimple();
@@ -70,10 +71,10 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Constructor initializing a FastBlurSimple instance with the specified encoding.
      * <br/>
-     * Initializes a FastBlurSimple instance with the given character encoding and 
-     * default key and shift values. Both dynamic shifting and parallel processing 
+     * Initializes a FastBlurSimple instance with the given character encoding and
+     * default key and shift values. Both dynamic shifting and parallel processing
      * are disabled.
-     * 
+     *
      * <p>Usage example:
      * <pre>{@code
      * FastBlurSimple blur = new FastBlurSimple(StandardCharsets.UTF_8);
@@ -88,12 +89,12 @@ public class FastBlurSimple extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurSimple instance with the specified encoding, 
+     * Constructor initializing a FastBlurSimple instance with the specified encoding,
      * key, and shift value (fixed shift mode).
      * <br/>
-     * Initializes a FastBlurSimple instance in fixed shift mode with the given 
+     * Initializes a FastBlurSimple instance in fixed shift mode with the given
      * parameters. Dynamic shifting and parallel processing are disabled.
-     * 
+     *
      * <p>Usage example:
      * <pre>{@code
      * FastBlurSimple blur = new FastBlurSimple(StandardCharsets.UTF_8, (byte) 0xCD, 5);
@@ -108,14 +109,14 @@ public class FastBlurSimple extends FastBlurBase {
     public FastBlurSimple(Charset encoding, byte key, int shift) {
         this(encoding, key, shift, false, false);
     }
-    
+
     /**
-     * Constructor initializing a FastBlurSimple instance with the specified encoding, 
+     * Constructor initializing a FastBlurSimple instance with the specified encoding,
      * key, shift value, and dynamic shift option.
      * <br/>
-     * Initializes a FastBlurSimple instance with the given parameters. Parallel 
+     * Initializes a FastBlurSimple instance with the given parameters. Parallel
      * processing is disabled.
-     * 
+     *
      * @param encoding      character encoding method
      * @param key           key for XOR operations
      * @param shift         fixed shift value (0-7) or key segment value (for dynamic shift)
@@ -128,11 +129,11 @@ public class FastBlurSimple extends FastBlurBase {
     }
 
     /**
-     * Constructor initializing a FastBlurSimple instance with the specified encoding, 
+     * Constructor initializing a FastBlurSimple instance with the specified encoding,
      * key, shift value, dynamic shift option, and parallel processing option.
      * <br/>
      * Fully configurable constructor for FastBlurSimple instances.
-     * 
+     *
      * @param encoding          character encoding method
      * @param key               key for XOR operations
      * @param shift             fixed shift value (0-7) or key segment value (for dynamic shift)
@@ -143,13 +144,35 @@ public class FastBlurSimple extends FastBlurBase {
      * @see #parallelProcessing
      */
     public FastBlurSimple(Charset encoding, byte key, int shift, boolean dynamicShift, boolean parallelProcessing) {
-        super(encoding, parallelProcessing, dynamicShift, 
-              dynamicShift ? key : key, 
-              dynamicShift ? (byte) ((key + shift) & 0xFF) : (byte) 0, 
-              dynamicShift ? shift & 0xFF : 0, 
+        super(encoding, parallelProcessing, dynamicShift,
+              dynamicShift ? key : key,
+              dynamicShift ? (byte) ((key + shift) & 0xFF) : (byte) 0,
+              dynamicShift ? shift & 0xFF : 0,
               dynamicShift ? 0 : shift & 0x7);
     }
-    
+
+    /**
+     * Constructor initializing a FastBlurSimple instance with the specified encoding,
+     * key, shift value, dynamic shift option, and custom ForkJoinPool.
+     * <br/>
+     * Fully configurable constructor for FastBlurSimple instances with custom ForkJoinPool.
+     *
+     * @param encoding          character encoding method
+     * @param key               key for XOR operations
+     * @param shift             fixed shift value (0-7) or key segment value (for dynamic shift)
+     * @param dynamicShift      whether to enable dynamic shifting
+     * @param pool              custom ForkJoinPool for parallel processing
+     * @see Charset
+     * @see #dynamicShift
+     */
+    public FastBlurSimple(Charset encoding, byte key, int shift, boolean dynamicShift, ForkJoinPool pool) {
+        super(encoding, true, dynamicShift,
+              dynamicShift ? key : key,
+              dynamicShift ? (byte) ((key + shift) & 0xFF) : (byte) 0,
+              dynamicShift ? shift & 0xFF : 0,
+              dynamicShift ? 0 : shift & 0x7, pool);
+    }
+
     /**
      * Simplified encryption of byte array (supports fixed shift and dynamic shift enhanced obfuscation).
      * <br/>
@@ -162,7 +185,7 @@ public class FastBlurSimple extends FastBlurBase {
      * 1. XOR data with first key fragment ({@link #keyPart1})
      * 2. Apply dynamic circular left shift based on byte position
      * 3. XOR result with second key fragment ({@link #keyPart2})
-     * 
+     *
      * In fixed shift mode, the process involves two steps:
      * 1. XOR data with the key ({@link #keyPart1})
      * 2. Apply fixed circular left shift ({@link #shift})
@@ -231,7 +254,7 @@ public class FastBlurSimple extends FastBlurBase {
             for (int i = 0; i < data.length; i++) {
                 // 步骤1：密钥异或
                 data[i] ^= keyPart1;
-                
+
                 // 步骤2：固定循环左移
                 if (shift != 0) {
                     int unsigned = data[i] & 0xFF;
@@ -246,8 +269,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Unrolled loop encryption method for small data.
      * <br/>
-     * Specifically optimized for performance with small data (≤128 bytes). This 
-     * method uses loop unrolling to reduce branching overhead and improve 
+     * Specifically optimized for performance with small data (≤128 bytes). This
+     * method uses loop unrolling to reduce branching overhead and improve
      * execution speed.
      *
      * <p>Optimization Techniques:
@@ -258,8 +281,8 @@ public class FastBlurSimple extends FastBlurBase {
      * </ul>
      * </p>
      *
-     * <p>In dynamic shift mode, processes 4 bytes at a time in the unrolled loop. 
-     * In fixed shift mode, processes 8 bytes at a time for even better performance 
+     * <p>In dynamic shift mode, processes 4 bytes at a time in the unrolled loop.
+     * In fixed shift mode, processes 8 bytes at a time for even better performance
      * with simple operations.
      * </p>
      *
@@ -270,13 +293,13 @@ public class FastBlurSimple extends FastBlurBase {
      */
     private byte[] encryptUnrolled(byte[] data) {
         final int len = data.length;
-        
+
         if (dynamicShift) {
             // 动态位移模式
             final byte kp1 = keyPart1;
             final byte kp2 = keyPart2;
             final int mask = shiftMask;
-            
+
             // 展开循环以减少分支开销
             int i = 0;
             for (; i <= len - 4; i += 4) {
@@ -335,50 +358,50 @@ public class FastBlurSimple extends FastBlurBase {
                     int unsigned = data[i] & 0xFF;
                     data[i] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+1] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+1] & 0xFF;
                     data[i+1] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+2] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+2] & 0xFF;
                     data[i+2] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+3] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+3] & 0xFF;
                     data[i+3] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+4] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+4] & 0xFF;
                     data[i+4] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+5] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+5] & 0xFF;
                     data[i+5] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+6] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+6] & 0xFF;
                     data[i+6] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
-                
+
                 data[i+7] ^= keyPart1;
                 if (shift != 0) {
                     int unsigned = data[i+7] & 0xFF;
                     data[i+7] = (byte) (FastBlurUtils.rotateLeft(unsigned, shift) & 0xFF);
                 }
             }
-            
+
             // 处理剩余字节
             for (; i < len; i++) {
                 data[i] ^= keyPart1;
@@ -388,7 +411,7 @@ public class FastBlurSimple extends FastBlurBase {
                 }
             }
         }
-        
+
         return data;
     }
 
@@ -404,7 +427,7 @@ public class FastBlurSimple extends FastBlurBase {
      * 1. XOR data with second key fragment ({@link #keyPart2})
      * 2. Apply dynamic circular right shift based on byte position
      * 3. XOR result with first key fragment ({@link #keyPart1})
-     * 
+     *
      * In fixed shift mode, the process is:
      * 1. Apply fixed circular right shift ({@link #shift})
      * 2. XOR data with the key ({@link #keyPart1})
@@ -477,7 +500,7 @@ public class FastBlurSimple extends FastBlurBase {
                     int shifted = FastBlurUtils.rotateRight(unsigned, shift);
                     encryptedData[i] = (byte) (shifted & 0xFF);
                 }
-                
+
                 // 逆步骤1：密钥异或
                 encryptedData[i] ^= keyPart1;
             }
@@ -488,8 +511,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Unrolled loop decryption method for small data.
      * <br/>
-     * Specifically optimized for performance with small data (≤128 bytes). This 
-     * method uses loop unrolling to reduce branching overhead and improve 
+     * Specifically optimized for performance with small data (≤128 bytes). This
+     * method uses loop unrolling to reduce branching overhead and improve
      * execution speed. Executes the inverse operations of {@link #encryptUnrolled(byte[])}.
      *
      * <p>Optimization Techniques:
@@ -501,8 +524,8 @@ public class FastBlurSimple extends FastBlurBase {
      * </ul>
      * </p>
      *
-     * <p>In dynamic shift mode, processes 4 bytes at a time in the unrolled loop. 
-     * In fixed shift mode, processes 8 bytes at a time for even better performance 
+     * <p>In dynamic shift mode, processes 4 bytes at a time in the unrolled loop.
+     * In fixed shift mode, processes 8 bytes at a time for even better performance
      * with simple operations.
      * </p>
      *
@@ -514,13 +537,13 @@ public class FastBlurSimple extends FastBlurBase {
      */
     private byte[] decryptUnrolled(byte[] encryptedData) {
         final int len = encryptedData.length;
-        
+
         if (dynamicShift) {
             // 动态位移模式
             final byte kp1 = keyPart1;
             final byte kp2 = keyPart2;
             final int mask = shiftMask;
-            
+
             // 展开循环以减少分支开销
             int i = 0;
             for (; i <= len - 4; i += 4) {
@@ -579,50 +602,50 @@ public class FastBlurSimple extends FastBlurBase {
                     encryptedData[i] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+1] & 0xFF;
                     encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+1] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+2] & 0xFF;
                     encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+2] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+3] & 0xFF;
                     encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+3] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+4] & 0xFF;
                     encryptedData[i+4] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+4] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+5] & 0xFF;
                     encryptedData[i+5] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+5] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+6] & 0xFF;
                     encryptedData[i+6] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+6] ^= keyPart1;
-                
+
                 if (shift != 0) {
                     int unsigned = encryptedData[i+7] & 0xFF;
                     encryptedData[i+7] = (byte) (FastBlurUtils.rotateRight(unsigned, shift) & 0xFF);
                 }
                 encryptedData[i+7] ^= keyPart1;
             }
-            
+
             // 处理剩余字节
             for (; i < len; i++) {
                 if (shift != 0) {
@@ -632,7 +655,7 @@ public class FastBlurSimple extends FastBlurBase {
                 encryptedData[i] ^= keyPart1;
             }
         }
-        
+
         return encryptedData;
     }
 
@@ -659,18 +682,32 @@ public class FastBlurSimple extends FastBlurBase {
      * @see ForkJoinPool#commonPool()
      */
     public byte[] encryptParallel(byte[] data) {
+        return encryptParallel(data, customPool);
+    }
+
+    /**
+     * Parallel encryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param data the original byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     * @return the encrypted byte array
+     * @see #encrypt(byte[])
+     * @see EncryptTask
+     */
+    public byte[] encryptParallel(byte[] data, ForkJoinPool pool) {
         if (data == null || data.length == 0) {
             return data;
         }
-        
+
         // 创建数据副本以避免修改原始数据
         byte[] dataCopy = new byte[data.length];
         System.arraycopy(data, 0, dataCopy, 0, data.length);
-        
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool pool = ForkJoinPool.commonPool();
+
+        // 使用指定的ForkJoin框架进行并行处理，避免频繁创建销毁线程池
         pool.invoke(new EncryptTask(dataCopy, 0, dataCopy.length, keyPart1, shift));
-        
+
         return dataCopy;
     }
 
@@ -697,26 +734,40 @@ public class FastBlurSimple extends FastBlurBase {
      * @see ForkJoinPool#commonPool()
      */
     public byte[] decryptParallel(byte[] encryptedData) {
+        return decryptParallel(encryptedData, customPool);
+    }
+
+    /**
+     * Parallel decryption of byte array with custom ForkJoinPool.
+     * <br/>
+     * Splits data into chunks for parallel processing, fully utilizing multi-core CPU advantages.
+     *
+     * @param encryptedData the encrypted byte array
+     * @param pool the ForkJoinPool to use for parallel processing
+     * @return the original byte array
+     * @see #decrypt(byte[])
+     * @see DecryptTask
+     */
+    public byte[] decryptParallel(byte[] encryptedData, ForkJoinPool pool) {
         if (encryptedData == null || encryptedData.length == 0) {
             return encryptedData;
         }
-        
+
         // 创建数据副本以避免修改原始数据
         byte[] dataCopy = new byte[encryptedData.length];
         System.arraycopy(encryptedData, 0, dataCopy, 0, encryptedData.length);
-        
-        // 使用公共ForkJoin框架进行并行处理，避免频繁创建销毁线程池
-        ForkJoinPool pool = ForkJoinPool.commonPool();
+
+        // 使用指定的ForkJoin框架进行并行处理，避免频繁创建销毁线程池
         pool.invoke(new DecryptTask(dataCopy, 0, dataCopy.length, keyPart1, shift));
-        
+
         return dataCopy;
     }
 
     /**
      * Encrypts a ByteBuffer (optional implementation).
      * <br/>
-     * Encrypts data in a direct ByteBuffer. For large data with {@link #parallelProcessing} 
-     * enabled, uses parallel processing. Otherwise performs serial processing directly 
+     * Encrypts data in a direct ByteBuffer. For large data with {@link #parallelProcessing}
+     * enabled, uses parallel processing. Otherwise performs serial processing directly
      * on the buffer to avoid memory allocation.
      *
      * <p>Processing Logic:
@@ -767,8 +818,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Zero-copy encryption of ByteBuffer.
      * <br/>
-     * Operates directly on the ByteBuffer to avoid additional memory allocation. 
-     * For large data with {@link #parallelProcessing} enabled, uses parallel processing. 
+     * Operates directly on the ByteBuffer to avoid additional memory allocation.
+     * For large data with {@link #parallelProcessing} enabled, uses parallel processing.
      * Otherwise performs serial processing directly on the buffer.
      *
      * <p>Difference from {@link #encrypt(ByteBuffer, int, int)}:
@@ -818,8 +869,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Decrypts a ByteBuffer (optional implementation).
      * <br/>
-     * Decrypts data in a direct ByteBuffer. For large data with {@link #parallelProcessing} 
-     * enabled, uses parallel processing. Otherwise performs serial processing directly 
+     * Decrypts data in a direct ByteBuffer. For large data with {@link #parallelProcessing}
+     * enabled, uses parallel processing. Otherwise performs serial processing directly
      * on the buffer to avoid memory allocation.
      *
      * <p>Processing Logic:
@@ -875,12 +926,12 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Zero-copy decryption of ByteBuffer.
      * <br/>
-     * Operates directly on the ByteBuffer to avoid additional memory allocation. 
-     * For large data with {@link #parallelProcessing} enabled, uses parallel processing. 
+     * Operates directly on the ByteBuffer to avoid additional memory allocation.
+     * For large data with {@link #parallelProcessing} enabled, uses parallel processing.
      * Otherwise performs serial processing directly on the buffer.
      *
      * <p>Behavior:
-     * Functions identically to {@link #decrypt(ByteBuffer, int, int)} for ByteBuffer 
+     * Functions identically to {@link #decrypt(ByteBuffer, int, int)} for ByteBuffer
      * decryption, but named differently to indicate the zero-copy nature of the operation.
      * </p>
      *
@@ -926,8 +977,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Encryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles encryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles encryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -943,34 +994,34 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Task threshold: 16KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 16384; // 任务阈值：16KB
-        
+
         private static final long serialVersionUID = -1180001722974992448L;
-        
+
         /**
          * Data to be encrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * Key for XOR operations.
          * <br/>
@@ -979,7 +1030,7 @@ public class FastBlurSimple extends FastBlurBase {
          * @see FastBlurSimple#keyPart1
          */
         private final byte key;
-        
+
         /**
          * Fixed shift value.
          * <br/>
@@ -992,7 +1043,7 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Constructs an EncryptTask for a data segment.
          * <br/>
-         * Initializes a task to encrypt a segment of a byte array using the 
+         * Initializes a task to encrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data  the data array to process
@@ -1012,7 +1063,7 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Computes the encryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly, or splits 
+         * Processes data segments smaller than the threshold directly, or splits
          * larger segments into subtasks for parallel processing.
          *
          * <p>Algorithm:
@@ -1049,8 +1100,8 @@ public class FastBlurSimple extends FastBlurBase {
     /**
      * Decryption task for parallel processing.
      * <br/>
-     * A RecursiveAction that handles decryption of a data segment in parallel. 
-     * Processes data segments smaller than the threshold directly, and splits 
+     * A RecursiveAction that handles decryption of a data segment in parallel.
+     * Processes data segments smaller than the threshold directly, and splits
      * larger segments into subtasks.
      *
      * <p>Parallel Processing Strategy:
@@ -1066,34 +1117,34 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Task threshold: 16KB.
          * <br/>
-         * Data segments smaller than this threshold are processed directly. 
+         * Data segments smaller than this threshold are processed directly.
          * Larger segments are split into subtasks.
          */
         private static final int THRESHOLD = 16384; // 任务阈值：16KB
-        
+
         private static final long serialVersionUID = -4052727379621115969L;
-        
+
         /**
          * Data to be decrypted.
          * <br/>
          * Reference to the shared data array being processed by all tasks.
          */
         private final byte[] data;
-        
+
         /**
          * Start index of the data segment to process.
          * <br/>
          * Inclusive start index within the data array.
          */
         private final int start;
-        
+
         /**
          * End index of the data segment to process.
          * <br/>
          * Exclusive end index within the data array.
          */
         private final int end;
-        
+
         /**
          * Key for XOR operations.
          * <br/>
@@ -1102,7 +1153,7 @@ public class FastBlurSimple extends FastBlurBase {
          * @see FastBlurSimple#keyPart1
          */
         private final byte key;
-        
+
         /**
          * Fixed shift value.
          * <br/>
@@ -1115,7 +1166,7 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Constructs a DecryptTask for a data segment.
          * <br/>
-         * Initializes a task to decrypt a segment of a byte array using the 
+         * Initializes a task to decrypt a segment of a byte array using the
          * specified key and shift parameters.
          *
          * @param data  the data array to process
@@ -1135,7 +1186,7 @@ public class FastBlurSimple extends FastBlurBase {
         /**
          * Computes the decryption task.
          * <br/>
-         * Processes data segments smaller than the threshold directly, or splits 
+         * Processes data segments smaller than the threshold directly, or splits
          * larger segments into subtasks for parallel processing.
          *
          * <p>Algorithm:

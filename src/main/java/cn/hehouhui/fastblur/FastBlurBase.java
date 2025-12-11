@@ -5,21 +5,22 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * Abstract base class for FastBlur algorithms.
  * <br/>
- * High-performance reversible lightweight encryption tool (dynamic shift enhanced obfuscation, 
- * security not guaranteed). Core: shift + XOR bitwise operations, reversible, obfuscation 
+ * High-performance reversible lightweight encryption tool (dynamic shift enhanced obfuscation,
+ * security not guaranteed). Core: shift + XOR bitwise operations, reversible, obfuscation
  * superior to fixed shift.
  *
- * <p>This class provides a simple data obfuscation mechanism base class that implements 
- * reversible data transformation through shift and XOR operations. Subclasses can implement 
+ * <p>This class provides a simple data obfuscation mechanism base class that implements
+ * reversible data transformation through shift and XOR operations. Subclasses can implement
  * different optimization strategies to meet specific performance requirements.</p>
  *
  * <p>Design Philosophy:
- * The FastBlur algorithm is designed as a lightweight data obfuscation technique rather 
- * than a secure encryption method. It combines bitwise operations (XOR and rotation) 
+ * The FastBlur algorithm is designed as a lightweight data obfuscation technique rather
+ * than a secure encryption method. It combines bitwise operations (XOR and rotation)
  * with dynamic shifting to provide reasonable obfuscation while maintaining high performance.
  * </p>
  *
@@ -46,8 +47,8 @@ public abstract class FastBlurBase {
     /**
      * Character encoding method, defaults to UTF-8.
      * <br/>
-     * This field determines how strings are converted to and from byte arrays during 
-     * encryption and decryption operations. UTF-8 is used as the default encoding 
+     * This field determines how strings are converted to and from byte arrays during
+     * encryption and decryption operations. UTF-8 is used as the default encoding
      * for broad compatibility with international character sets.
      *
      * @see StandardCharsets#UTF_8
@@ -57,69 +58,76 @@ public abstract class FastBlurBase {
     /**
      * Whether parallel processing is enabled.
      * <br/>
-     * When enabled, large data sets will be processed using parallel computing 
-     * techniques to improve performance on multi-core systems. This flag controls 
+     * When enabled, large data sets will be processed using parallel computing
+     * techniques to improve performance on multi-core systems. This flag controls
      * whether the implementation should attempt to leverage multiple CPU cores.
      *
      * @see #encryptParallel(byte[])
-     * @see #decryptParallel(byte[])
      */
     protected final boolean parallelProcessing;
-    
+
     /**
      * Whether dynamic shifting is enabled.
      * <br/>
-     * Dynamic shifting varies the bit shift amount based on the position of each 
-     * byte in the data array. This provides better obfuscation compared to fixed 
+     * Dynamic shifting varies the bit shift amount based on the position of each
+     * byte in the data array. This provides better obfuscation compared to fixed
      * shifting, as identical bytes at different positions will be transformed differently.
      *
      * @see FastBlurUtils#getDynamicShift(int, int)
      */
     protected final boolean dynamicShift;
-    
+
     /**
      * Precomputed key fragment 1 (used for XOR operations).
      * <br/>
-     * This is the first part of a split-key approach where the key is divided 
-     * into multiple parts that are applied at different stages of the encryption 
+     * This is the first part of a split-key approach where the key is divided
+     * into multiple parts that are applied at different stages of the encryption
      * process. In dynamic shift mode, this is applied before the shift operation.
      */
     protected final byte keyPart1;
-    
+
     /**
      * Precomputed key fragment 2 (used for XOR operations).
      * <br/>
-     * This is the second part of a split-key approach. In dynamic shift mode, 
-     * this is applied after the shift operation, providing a form of double 
+     * This is the second part of a split-key approach. In dynamic shift mode,
+     * this is applied after the shift operation, providing a form of double
      * encryption for each byte.
      */
     protected final byte keyPart2;
-    
+
     /**
      * Mask used for shift calculation.
      * <br/>
-     * In dynamic shift mode, this mask is used in conjunction with the byte 
-     * position to calculate the specific shift amount for each byte. This 
+     * In dynamic shift mode, this mask is used in conjunction with the byte
+     * position to calculate the specific shift amount for each byte. This
      * contributes to the dynamic nature of the algorithm.
      *
      * @see FastBlurUtils#getDynamicShift(int, int)
      */
     protected final int shiftMask;
-    
+
     /**
      * Fixed shift value.
      * <br/>
-     * In fixed shift mode, this value determines how many bit positions each 
-     * byte will be shifted during encryption. The value is constrained to 
+     * In fixed shift mode, this value determines how many bit positions each
+     * byte will be shifted during encryption. The value is constrained to
      * the range 0-7 as only 8-bit values are being processed.
      */
     protected final int shift;
 
     /**
+     * Custom ForkJoinPool for parallel processing.
+     * <br/>
+     * When parallel processing is enabled and a custom pool is provided,
+     * this pool will be used instead of the common pool.
+     */
+    protected final ForkJoinPool customPool;
+
+    /**
      * Constructor using default UTF-8 encoding.
      * <br/>
-     * Initializes a FastBlurBase instance with UTF-8 character encoding and 
-     * default configuration values. Parallel processing is disabled, dynamic 
+     * Initializes a FastBlurBase instance with UTF-8 character encoding and
+     * default configuration values. Parallel processing is disabled, dynamic
      * shifting is enabled, and default key fragments are used.
      *
      * <p>Usage example:
@@ -131,14 +139,14 @@ public abstract class FastBlurBase {
      * @see StandardCharsets#UTF_8
      */
     protected FastBlurBase() {
-        this(StandardCharsets.UTF_8, false, true, (byte) 0, (byte) 0, 0, 0);
+        this(StandardCharsets.UTF_8, false, true, (byte) 0, (byte) 0, 0, 0, null);
     }
 
     /**
      * Constructor with specified encoding.
      * <br/>
-     * Initializes a FastBlurBase instance with the specified character encoding 
-     * and default configuration values. Parallel processing is disabled, dynamic 
+     * Initializes a FastBlurBase instance with the specified character encoding
+     * and default configuration values. Parallel processing is disabled, dynamic
      * shifting is enabled, and default key fragments are used.
      *
      * <p>Usage example:
@@ -151,14 +159,14 @@ public abstract class FastBlurBase {
      * @see Charset
      */
     protected FastBlurBase(Charset encoding) {
-        this(encoding, false, true, (byte) 0, (byte) 0, 0, 0);
+        this(encoding, false, true, (byte) 0, (byte) 0, 0, 0, null);
     }
 
     /**
      * Constructor with specified encoding and parallel processing option.
      * <br/>
-     * Initializes a FastBlurBase instance with the specified character encoding 
-     * and parallel processing option. Dynamic shifting is enabled, and default 
+     * Initializes a FastBlurBase instance with the specified character encoding
+     * and parallel processing option. Dynamic shifting is enabled, and default
      * key fragments are used.
      *
      * <p>Usage example:
@@ -173,14 +181,14 @@ public abstract class FastBlurBase {
      * @see #parallelProcessing
      */
     protected FastBlurBase(Charset encoding, boolean parallelProcessing) {
-        this(encoding, parallelProcessing, true, (byte) 0, (byte) 0, 0, 0);
+        this(encoding, parallelProcessing, true, (byte) 0, (byte) 0, 0, 0, null);
     }
-    
+
     /**
      * Constructor with complete parameter list.
      * <br/>
-     * Fully configurable constructor allowing specification of all FastBlurBase 
-     * parameters. This is typically called by subclass constructors to initialize 
+     * Fully configurable constructor allowing specification of all FastBlurBase
+     * parameters. This is typically called by subclass constructors to initialize
      * all fields.
      *
      * @param encoding character encoding method to use
@@ -192,8 +200,30 @@ public abstract class FastBlurBase {
      * @param shift fixed shift value used in static mode
      * @see Charset
      */
-    protected FastBlurBase(Charset encoding, boolean parallelProcessing, boolean dynamicShift, 
+    protected FastBlurBase(Charset encoding, boolean parallelProcessing, boolean dynamicShift,
                           byte keyPart1, byte keyPart2, int shiftMask, int shift) {
+        this(encoding, parallelProcessing, dynamicShift, keyPart1, keyPart2, shiftMask, shift, null);
+    }
+
+    /**
+     * Constructor with complete parameter list including custom ForkJoinPool.
+     * <br/>
+     * Fully configurable constructor allowing specification of all FastBlurBase
+     * parameters including a custom ForkJoinPool for parallel processing.
+     *
+     * @param encoding character encoding method to use
+     * @param parallelProcessing whether to enable parallel processing
+     * @param dynamicShift whether to enable dynamic shifting
+     * @param keyPart1 first key fragment for XOR operations
+     * @param keyPart2 second key fragment for XOR operations
+     * @param shiftMask mask used for shift calculation in dynamic mode
+     * @param shift fixed shift value used in static mode
+     * @param customPool custom ForkJoinPool for parallel processing
+     * @see Charset
+     */
+    protected FastBlurBase(Charset encoding, boolean parallelProcessing, boolean dynamicShift,
+                          byte keyPart1, byte keyPart2, int shiftMask, int shift,
+                          java.util.concurrent.ForkJoinPool customPool) {
         this.encoding = encoding;
         this.parallelProcessing = parallelProcessing;
         this.dynamicShift = dynamicShift;
@@ -201,13 +231,14 @@ public abstract class FastBlurBase {
         this.keyPart2 = keyPart2;
         this.shiftMask = shiftMask;
         this.shift = shift;
+        this.customPool = parallelProcessing ? (customPool == null ? ForkJoinPool.commonPool() : customPool) : customPool;
     }
 
     /**
      * Encrypts a byte array.
      * <br/>
-     * This abstract method must be implemented by subclasses to provide 
-     * specific encryption logic. The method transforms the input data using 
+     * This abstract method must be implemented by subclasses to provide
+     * specific encryption logic. The method transforms the input data using
      * the configured algorithm parameters (key fragments, shift mode, etc.).
      *
      * <p>Implementation Requirements:
@@ -239,8 +270,8 @@ public abstract class FastBlurBase {
     /**
      * Decrypts a byte array.
      * <br/>
-     * This abstract method must be implemented by subclasses to provide 
-     * specific decryption logic. The method reverses the transformations 
+     * This abstract method must be implemented by subclasses to provide
+     * specific decryption logic. The method reverses the transformations
      * applied during encryption to recover the original data.
      *
      * <p>Implementation Requirements:
@@ -270,15 +301,19 @@ public abstract class FastBlurBase {
      */
     public abstract byte[] decrypt(byte[] encryptedData);
 
+
+
+
+
     /**
      * Encrypts a ByteBuffer (optional implementation).
      * <br/>
-     * Encrypts data stored in a direct ByteBuffer. This method copies data from 
-     * the buffer to a temporary array, encrypts it, and writes it back. Subclasses 
+     * Encrypts data stored in a direct ByteBuffer. This method copies data from
+     * the buffer to a temporary array, encrypts it, and writes it back. Subclasses
      * may override this method for more efficient implementations.
      *
-     * <p>Note: This default implementation creates temporary arrays and copies data, 
-     * which may impact performance. For better performance, subclasses should 
+     * <p>Note: This default implementation creates temporary arrays and copies data,
+     * which may impact performance. For better performance, subclasses should
      * provide optimized implementations that work directly with the buffer.
      * </p>
      *
@@ -316,12 +351,12 @@ public abstract class FastBlurBase {
     /**
      * Zero-copy encryption of ByteBuffer.
      * <br/>
-     * Operates directly on the ByteBuffer to avoid additional memory allocation. 
-     * This method attempts to perform encryption without copying data to temporary 
+     * Operates directly on the ByteBuffer to avoid additional memory allocation.
+     * This method attempts to perform encryption without copying data to temporary
      * arrays. Subclasses should override this method for true zero-copy implementations.
      *
-     * <p>The default implementation falls back to the regular encryption method. 
-     * Subclasses that can work directly with ByteBuffers should override this 
+     * <p>The default implementation falls back to the regular encryption method.
+     * Subclasses that can work directly with ByteBuffers should override this
      * method for improved performance.
      * </p>
      *
@@ -348,12 +383,12 @@ public abstract class FastBlurBase {
     /**
      * Decrypts a ByteBuffer (optional implementation).
      * <br/>
-     * Decrypts data stored in a direct ByteBuffer. This method copies data from 
-     * the buffer to a temporary array, decrypts it, and writes it back. Subclasses 
+     * Decrypts data stored in a direct ByteBuffer. This method copies data from
+     * the buffer to a temporary array, decrypts it, and writes it back. Subclasses
      * may override this method for more efficient implementations.
      *
-     * <p>Note: This default implementation creates temporary arrays and copies data, 
-     * which may impact performance. For better performance, subclasses should 
+     * <p>Note: This default implementation creates temporary arrays and copies data,
+     * which may impact performance. For better performance, subclasses should
      * provide optimized implementations that work directly with the buffer.
      * </p>
      *
@@ -391,12 +426,12 @@ public abstract class FastBlurBase {
     /**
      * Zero-copy decryption of ByteBuffer.
      * <br/>
-     * Operates directly on the ByteBuffer to avoid additional memory allocation. 
-     * This method attempts to perform decryption without copying data to temporary 
+     * Operates directly on the ByteBuffer to avoid additional memory allocation.
+     * This method attempts to perform decryption without copying data to temporary
      * arrays. Subclasses should override this method for true zero-copy implementations.
      *
-     * <p>The default implementation falls back to the regular decryption method. 
-     * Subclasses that can work directly with ByteBuffers should override this 
+     * <p>The default implementation falls back to the regular decryption method.
+     * Subclasses that can work directly with ByteBuffers should override this
      * method for improved performance.
      * </p>
      *
@@ -423,11 +458,11 @@ public abstract class FastBlurBase {
     /**
      * Encrypts a byte array and returns a Base64 encoded string.
      * <br/>
-     * This convenience method combines encryption with Base64 encoding to produce 
-     * a string representation of the encrypted data. This is useful for storing 
+     * This convenience method combines encryption with Base64 encoding to produce
+     * a string representation of the encrypted data. This is useful for storing
      * or transmitting encrypted data in text formats.
      *
-     * <p>The method creates a copy of the input data to avoid modifying the original 
+     * <p>The method creates a copy of the input data to avoid modifying the original
      * array, then encrypts the copy and encodes it using Base64.
      * </p>
      *
@@ -460,11 +495,11 @@ public abstract class FastBlurBase {
     /**
      * Decrypts a Base64 encoded string.
      * <br/>
-     * This convenience method decodes a Base64 string and then decrypts the 
-     * resulting byte array, returning the original string using the configured 
+     * This convenience method decodes a Base64 string and then decrypts the
+     * resulting byte array, returning the original string using the configured
      * character encoding.
      *
-     * <p>This method is the counterpart to {@link #encryptBase64(byte[])}, completing 
+     * <p>This method is the counterpart to {@link #encryptBase64(byte[])}, completing
      * the encrypt-encode/decode-decrypt cycle for string data.
      * </p>
      *
@@ -493,8 +528,8 @@ public abstract class FastBlurBase {
     /**
      * Gets a builder instance.
      * <br/>
-     * Returns a new FastBlurBuilder instance that can be used to configure and 
-     * create FastBlur instances with specific settings. This is the recommended 
+     * Returns a new FastBlurBuilder instance that can be used to configure and
+     * create FastBlur instances with specific settings. This is the recommended
      * way to create FastBlur instances.
      *
      * <p>Usage example:
@@ -518,13 +553,13 @@ public abstract class FastBlurBase {
     /**
      * FastBlur builder class.
      * <br/>
-     * Used to build FastBlur instances with different strategies and configurations. 
-     * The builder pattern allows for flexible and readable construction of FastBlur 
+     * Used to build FastBlur instances with different strategies and configurations.
+     * The builder pattern allows for flexible and readable construction of FastBlur
      * instances with various options.
      *
      * <p>Design Philosophy:
-     * The builder pattern separates the complex construction logic from the 
-     * FastBlur classes themselves, making it easier to add new configuration 
+     * The builder pattern separates the complex construction logic from the
+     * FastBlur classes themselves, making it easier to add new configuration
      * options without complicating constructors.
      * </p>
      *
@@ -536,67 +571,67 @@ public abstract class FastBlurBase {
         /**
          * Character encoding to use, defaults to UTF-8.
          * <br/>
-         * Determines how strings are converted to byte arrays for encryption and 
+         * Determines how strings are converted to byte arrays for encryption and
          * back to strings after decryption.
          *
          * @see #withEncoding(Charset)
          * @see StandardCharsets
          */
         private Charset encoding = StandardCharsets.UTF_8;
-        
+
         /**
          * Strategy to use for FastBlur implementation, defaults to MEMORY_FIRST.
          * <br/>
-         * Different strategies offer various trade-offs between memory usage, 
+         * Different strategies offer various trade-offs between memory usage,
          * processing speed, and other performance characteristics.
          *
          * @see #withStrategy(FastBlurStrategy)
          * @see FastBlurStrategy
          */
         private FastBlurStrategy strategy = FastBlurStrategy.MEMORY_FIRST;
-        
+
         /**
          * Whether to use dynamic shifting, defaults to true.
          * <br/>
-         * Dynamic shifting varies the bit shift amount based on byte position, 
+         * Dynamic shifting varies the bit shift amount based on byte position,
          * providing better obfuscation than fixed shifting.
          *
          * @see #withDynamicShift(boolean)
          * @see FastBlurBase#dynamicShift
          */
         private boolean dynamicShift = true;
-        
+
         /**
          * Whether to enable parallel processing, defaults to false.
          * <br/>
-         * Enables parallel processing for large data sets to improve performance 
+         * Enables parallel processing for large data sets to improve performance
          * on multi-core systems.
          *
          * @see #withParallelProcessing(boolean)
          * @see FastBlurBase#parallelProcessing
          */
         private boolean parallelProcessing = false;
-        
+
         /**
          * Secret key for dynamic shifting algorithms, defaults to 0x5A7B9C1D3E8F0A2BL.
          * <br/>
-         * This 64-bit key is used in dynamic shifting modes to generate key fragments 
+         * This 64-bit key is used in dynamic shifting modes to generate key fragments
          * and shift masks.
          *
          * @see #withSecretKey(long)
          */
         private long secretKey = 0x5A7B9C1D3E8F0A2BL;
-        
+
         /**
          * Key segment for dynamic shifting algorithms, derived from secretKey by default.
          * <br/>
-         * This byte value is extracted from the secret key and used in dynamic 
+         * This byte value is extracted from the secret key and used in dynamic
          * shift calculations.
          *
          * @see #withKeySegment(byte)
          */
         private byte keySegment = (byte) ((0x5A7B9C1D3E8F0A2BL >> 16) & 0xFF);
-        
+
         /**
          * Simple key for fixed shifting algorithms, defaults to (byte) 0xAB.
          * <br/>
@@ -605,12 +640,12 @@ public abstract class FastBlurBase {
          * @see #withSimpleKey(byte)
          */
         private byte simpleKey = (byte) 0xAB;
-        
+
         /**
          * Fixed shift value for fixed shifting algorithms, defaults to 3.
          * <br/>
-         * This value determines how many bit positions each byte is shifted in 
-         * fixed shift mode. It is constrained to 0-7 since we're working with 
+         * This value determines how many bit positions each byte is shifted in
+         * fixed shift mode. It is constrained to 0-7 since we're working with
          * 8-bit values.
          *
          * @see #withShiftValue(int)
@@ -620,7 +655,7 @@ public abstract class FastBlurBase {
         /**
          * Sets the character encoding method.
          * <br/>
-         * Configures the character encoding to be used when converting between 
+         * Configures the character encoding to be used when converting between
          * strings and byte arrays during encryption and decryption operations.
          *
          * <p>Usage example:
@@ -645,7 +680,7 @@ public abstract class FastBlurBase {
         /**
          * Sets the strategy type.
          * <br/>
-         * Configures which FastBlur implementation strategy to use. Different 
+         * Configures which FastBlur implementation strategy to use. Different
          * strategies offer various trade-offs between memory usage and processing speed.
          *
          * <p>Usage example:
@@ -669,8 +704,8 @@ public abstract class FastBlurBase {
         /**
          * Sets whether to use dynamic shifting.
          * <br/>
-         * When enabled, the bit shift amount varies based on the position of each 
-         * byte in the data array. This provides better obfuscation compared to 
+         * When enabled, the bit shift amount varies based on the position of each
+         * byte in the data array. This provides better obfuscation compared to
          * fixed shifting.
          *
          * <p>Usage example:
@@ -694,7 +729,7 @@ public abstract class FastBlurBase {
         /**
          * Sets whether to enable parallel processing.
          * <br/>
-         * When enabled, large data sets will be processed using parallel computing 
+         * When enabled, large data sets will be processed using parallel computing
          * techniques to improve performance on multi-core systems.
          *
          * <p>Usage example:
@@ -718,7 +753,7 @@ public abstract class FastBlurBase {
         /**
          * Checks whether parallel processing is enabled.
          * <br/>
-         * Returns the current setting for parallel processing. This can be used 
+         * Returns the current setting for parallel processing. This can be used
          * to check the configuration before building the FastBlur instance.
          *
          * <p>Usage example:
@@ -742,7 +777,7 @@ public abstract class FastBlurBase {
         /**
          * Sets the secret key (used for dynamic shift algorithms).
          * <br/>
-         * Configures the 64-bit secret key used in dynamic shifting modes to 
+         * Configures the 64-bit secret key used in dynamic shifting modes to
          * generate key fragments and shift masks.
          *
          * <p>Usage example:
@@ -766,7 +801,7 @@ public abstract class FastBlurBase {
         /**
          * Sets the key segment value (used for dynamic shift algorithms).
          * <br/>
-         * Configures the key segment byte value used in dynamic shift calculations. 
+         * Configures the key segment byte value used in dynamic shift calculations.
          * This is typically extracted from the secret key but can be customized.
          *
          * <p>Usage example:
@@ -813,8 +848,8 @@ public abstract class FastBlurBase {
         /**
          * Sets the shift value (used for fixed shift algorithms).
          * <br/>
-         * Configures the fixed shift value used in fixed shift mode. This value 
-         * determines how many bit positions each byte is shifted. Values are 
+         * Configures the fixed shift value used in fixed shift mode. This value
+         * determines how many bit positions each byte is shifted. Values are
          * automatically constrained to the range 0-7.
          *
          * <p>Usage example:
@@ -838,8 +873,8 @@ public abstract class FastBlurBase {
         /**
          * Builds a FastBlur instance.
          * <br/>
-         * Creates a FastBlur instance based on the current configuration. The 
-         * specific implementation is selected based on the configured strategy 
+         * Creates a FastBlur instance based on the current configuration. The
+         * specific implementation is selected based on the configured strategy
          * and options.
          *
          * <p>Implementation Selection Logic:
@@ -848,7 +883,6 @@ public abstract class FastBlurBase {
          *   <li>{@link FastBlurStrategy#SPEED_FIRST} with fixed shift -> {@link FastBlurSimple}</li>
          *   <li>{@link FastBlurStrategy#VECTOR} with dynamic shift -> {@link FastBlurVectorized}</li>
          *   <li>{@link FastBlurStrategy#VECTOR} with fixed shift -> {@link FastBlurSimple}</li>
-         *   <li>{@link FastBlurStrategy#ADAPTIVE} -> {@link FastBlurAdaptive}</li>
          *   <li>{@link FastBlurStrategy#MEMORY_FIRST} with dynamic shift -> {@link FastBlurOptimized}</li>
          *   <li>{@link FastBlurStrategy#MEMORY_FIRST} with fixed shift -> {@link FastBlurSimple}</li>
          * </ul>
@@ -877,24 +911,60 @@ public abstract class FastBlurBase {
             switch (strategy) {
                 case SPEED_FIRST:
                     if (dynamicShift) {
-                        return new cn.hehouhui.fastblur.FastBlurUltra(encoding, secretKey, keySegment, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurUltra(encoding, secretKey, keySegment, false);
                     } else {
-                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, false);
                     }
                 case VECTOR:
                     if (dynamicShift) {
-                        return new cn.hehouhui.fastblur.FastBlurVectorized(encoding, secretKey, keySegment, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurVectorized(encoding, secretKey, keySegment, false);
                     } else {
-                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, false);
                     }
-                case ADAPTIVE:
-                    return new cn.hehouhui.fastblur.FastBlurAdaptive(encoding, secretKey, keySegment, parallelProcessing);
+
                 case MEMORY_FIRST:
                 default:
                     if (dynamicShift) {
-                        return new cn.hehouhui.fastblur.FastBlurOptimized(encoding, secretKey, keySegment, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurOptimized(encoding, secretKey, keySegment, false);
                     } else {
-                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, parallelProcessing);
+                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, false);
+                    }
+            }
+        }
+
+        /**
+         * Builds a FastBlur instance with parallel processing enabled.
+         * <br/>
+         * Creates a FastBlur instance with parallel processing enabled, using the common ForkJoinPool.
+         *
+         * @return FastBlurBase instance with parallel processing enabled
+         * @see #build()
+         */
+        public FastBlurBase buildParallel() {
+            return buildParallel(java.util.concurrent.ForkJoinPool.commonPool());
+        }
+
+        /**
+         * Builds a FastBlur instance with parallel processing enabled and a custom ForkJoinPool.
+         * <br/>
+         * Creates a FastBlur instance with parallel processing enabled, using the specified ForkJoinPool.
+         *
+         * @param pool the ForkJoinPool to use for parallel processing
+         * @return FastBlurBase instance with parallel processing enabled
+         * @see #build()
+         */
+        public FastBlurBase buildParallel(java.util.concurrent.ForkJoinPool pool) {
+            switch (strategy) {
+                case SPEED_FIRST:
+                    return new cn.hehouhui.fastblur.FastBlurUltra(encoding, secretKey, keySegment, dynamicShift, pool);
+                case VECTOR:
+                    return new cn.hehouhui.fastblur.FastBlurVectorized(encoding, secretKey, keySegment, dynamicShift, pool);
+                case MEMORY_FIRST:
+                default:
+                    if (dynamicShift) {
+                        return new cn.hehouhui.fastblur.FastBlurOptimized(encoding, secretKey, keySegment, true, pool);
+                    } else {
+                        return new cn.hehouhui.fastblur.FastBlurSimple(encoding, simpleKey, shiftValue, false, pool);
                     }
             }
         }
