@@ -41,12 +41,37 @@ public abstract class FastBlurBase {
      * 是否启用并行处理
      */
     protected final boolean parallelProcessing;
+    
+    /**
+     * 是否启用动态位移
+     */
+    protected final boolean dynamicShift;
+    
+    /**
+     * 预计算的密钥片段1（用于异或运算）
+     */
+    protected final byte keyPart1;
+    
+    /**
+     * 预计算的密钥片段2（用于异或运算）
+     */
+    protected final byte keyPart2;
+    
+    /**
+     * 用于位移计算的掩码
+     */
+    protected final int shiftMask;
+    
+    /**
+     * 固定位移值
+     */
+    protected final int shift;
 
     /**
      * 构造函数，使用默认UTF-8编码
      */
     protected FastBlurBase() {
-        this(StandardCharsets.UTF_8, false);
+        this(StandardCharsets.UTF_8, false, true, (byte) 0, (byte) 0, 0, 0);
     }
 
     /**
@@ -55,7 +80,7 @@ public abstract class FastBlurBase {
      * @param encoding 字符编码方式
      */
     protected FastBlurBase(Charset encoding) {
-        this(encoding, false);
+        this(encoding, false, true, (byte) 0, (byte) 0, 0, 0);
     }
 
     /**
@@ -65,8 +90,29 @@ public abstract class FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     protected FastBlurBase(Charset encoding, boolean parallelProcessing) {
+        this(encoding, parallelProcessing, true, (byte) 0, (byte) 0, 0, 0);
+    }
+    
+    /**
+     * 构造函数，使用完整的参数列表
+     *
+     * @param encoding           字符编码方式
+     * @param parallelProcessing 是否启用并行处理
+     * @param dynamicShift       是否启用动态位移
+     * @param keyPart1           密钥片段1
+     * @param keyPart2           密钥片段2
+     * @param shiftMask          位移掩码
+     * @param shift              固定位移值
+     */
+    protected FastBlurBase(Charset encoding, boolean parallelProcessing, boolean dynamicShift, 
+                          byte keyPart1, byte keyPart2, int shiftMask, int shift) {
         this.encoding = encoding;
         this.parallelProcessing = parallelProcessing;
+        this.dynamicShift = dynamicShift;
+        this.keyPart1 = keyPart1;
+        this.keyPart2 = keyPart2;
+        this.shiftMask = shiftMask;
+        this.shift = shift;
     }
 
     /**

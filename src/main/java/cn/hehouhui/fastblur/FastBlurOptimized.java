@@ -38,32 +38,6 @@ import java.util.concurrent.RecursiveAction;
  */
 public class FastBlurOptimized extends FastBlurBase {
 
-
-    /**
-     * 预计算的密钥片段1（用于异或运算）
-     */
-    private final byte keyPart1;
-
-    /**
-     * 预计算的密钥片段2（用于异或运算）
-     */
-    private final byte keyPart2;
-
-    /**
-     * 用于位移计算的掩码
-     */
-    private final int shiftMask;
-    
-    /**
-     * 固定位移值
-     */
-    private final int shift;
-    
-    /**
-     * 是否启用动态位移
-     */
-    private final boolean dynamicShift;
-
     /**
      * 默认构造函数，使用UTF-8字符集编码
      *
@@ -137,44 +111,11 @@ public class FastBlurOptimized extends FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     public FastBlurOptimized(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
-        super(encoding, parallelProcessing);
-        this.dynamicShift = dynamicShift;
-        
-        if (dynamicShift) {
-            // 动态位移模式
-            // 预计算密钥片段，避免在每次加密/解密时重复计算
-            this.keyPart1 = (byte) (key & 0xFF);
-            this.keyPart2 = (byte) ((key >> 8) & 0xFF);
-            this.shiftMask = shiftParam & 0xFF;
-            this.shift = 0; // 固定位移值在动态模式下不使用
-        } else {
-            // 固定位移模式
-            this.keyPart1 = (byte) (key & 0xFF); // 用于异或运算的密钥
-            this.shift = shiftParam & 0x7; // 确保位移值在0-7之间
-            this.keyPart2 = 0; // 动态位移参数在固定模式下不使用
-            this.shiftMask = 0; // 动态位移参数在固定模式下不使用
-        }
-    }
-
-    /**
-     * 动态计算位移位数（核心增强点）
-     *
-     * <p>根据字节索引和密钥分段值动态计算位移位数，确保结果在0-7之间。
-     * 这种动态计算增加了算法的复杂度和安全性。</p>
-     *
-     * <p>示例用法：
-     * <pre>{@code
-     * FastBlurOptimized blur = new FastBlurOptimized();
-     * int shift = blur.getDynamicShift(5); // 计算索引为5的字节的位移数
-     * }</pre>
-     * </p>
-     *
-     * @param index 字节数组下标
-     * @return 0-7之间的位移数
-     */
-    private int getDynamicShift(int index) {
-        // 规则：下标 + 密钥分段值 取模8，保证位移数0-7
-        return (index + shiftMask) & 0x7; // 使用位运算代替取模运算，提高性能
+        super(encoding, parallelProcessing, dynamicShift,
+              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+              dynamicShift ? shiftParam & 0xFF : 0,
+              dynamicShift ? 0 : shiftParam & 0x7);
     }
 
     /**
@@ -221,7 +162,7 @@ public class FastBlurOptimized extends FastBlurBase {
             // 动态位移模式
             // 直接在原数组上操作，避免数组复制开销
             for (int i = 0; i < data.length; i++) {
-                int dynamicShift = getDynamicShift(i);
+                int dynamicShift = FastBlurUtils.getDynamicShift(i, shiftMask);
 
                 // 步骤1：第一段密钥异或
                 data[i] ^= keyPart1;
@@ -229,7 +170,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 步骤2：动态循环左移（内联操作避免函数调用开销）
                 if (dynamicShift != 0) {
                     int unsigned = data[i] & 0xFF;
-                    int shifted = (unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift));
+                    int shifted = FastBlurUtils.rotateLeft(unsigned, dynamicShift);
                     data[i] = (byte) (shifted & 0xFF);
                 }
 
@@ -246,7 +187,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 步骤2：固定循环左移
                 if (shift != 0) {
                     int unsigned = data[i] & 0xFF;
-                    int shifted = (unsigned << shift) | (unsigned >>> (8 - shift));
+                    int shifted = FastBlurUtils.rotateLeft(unsigned, shift);
                     data[i] = (byte) (shifted & 0xFF);
                 }
             }
@@ -271,46 +212,46 @@ public class FastBlurOptimized extends FastBlurBase {
         int i = 0;
         for (; i <= len - 4; i += 4) {
             // 处理4个字节
-            int dynamicShift0 = (i + mask) & 0x7;
+            int dynamicShift0 = FastBlurUtils.getDynamicShift(i, mask);
             data[i] ^= kp1;
             if (dynamicShift0 != 0) {
                 int unsigned = data[i] & 0xFF;
-                data[i] = (byte) (((unsigned << dynamicShift0) | (unsigned >>> (8 - dynamicShift0))) & 0xFF);
+                data[i] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift0) & 0xFF);
             }
             data[i] ^= kp2;
 
-            int dynamicShift1 = ((i + 1) + mask) & 0x7;
+            int dynamicShift1 = FastBlurUtils.getDynamicShift(i + 1, mask);
             data[i+1] ^= kp1;
             if (dynamicShift1 != 0) {
                 int unsigned = data[i+1] & 0xFF;
-                data[i+1] = (byte) (((unsigned << dynamicShift1) | (unsigned >>> (8 - dynamicShift1))) & 0xFF);
+                data[i+1] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift1) & 0xFF);
             }
             data[i+1] ^= kp2;
 
-            int dynamicShift2 = ((i + 2) + mask) & 0x7;
+            int dynamicShift2 = FastBlurUtils.getDynamicShift(i + 2, mask);
             data[i+2] ^= kp1;
             if (dynamicShift2 != 0) {
                 int unsigned = data[i+2] & 0xFF;
-                data[i+2] = (byte) (((unsigned << dynamicShift2) | (unsigned >>> (8 - dynamicShift2))) & 0xFF);
+                data[i+2] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift2) & 0xFF);
             }
             data[i+2] ^= kp2;
 
-            int dynamicShift3 = ((i + 3) + mask) & 0x7;
+            int dynamicShift3 = FastBlurUtils.getDynamicShift(i + 3, mask);
             data[i+3] ^= kp1;
             if (dynamicShift3 != 0) {
                 int unsigned = data[i+3] & 0xFF;
-                data[i+3] = (byte) (((unsigned << dynamicShift3) | (unsigned >>> (8 - dynamicShift3))) & 0xFF);
+                data[i+3] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift3) & 0xFF);
             }
             data[i+3] ^= kp2;
         }
 
         // 处理剩余字节
         for (; i < len; i++) {
-            int dynamicShift = (i + mask) & 0x7;
+            int dynamicShift = FastBlurUtils.getDynamicShift(i, mask);
             data[i] ^= kp1;
             if (dynamicShift != 0) {
                 int unsigned = data[i] & 0xFF;
-                data[i] = (byte) (((unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift))) & 0xFF);
+                data[i] = (byte) (FastBlurUtils.rotateLeft(unsigned, dynamicShift) & 0xFF);
             }
             data[i] ^= kp2;
         }
@@ -357,7 +298,7 @@ public class FastBlurOptimized extends FastBlurBase {
             // 动态位移模式
             // 直接在原数组上操作，避免数组复制开销
             for (int i = 0; i < encryptedData.length; i++) {
-                int dynamicShift = getDynamicShift(i);
+                int dynamicShift = FastBlurUtils.getDynamicShift(i, shiftMask);
 
                 // 逆步骤3：第二段密钥异或还原
                 encryptedData[i] ^= keyPart2;
@@ -365,7 +306,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 逆步骤2：动态循环右移（内联操作避免函数调用开销）
                 if (dynamicShift != 0) {
                     int unsigned = encryptedData[i] & 0xFF;
-                    int shifted = (unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift));
+                    int shifted = FastBlurUtils.rotateRight(unsigned, dynamicShift);
                     encryptedData[i] = (byte) (shifted & 0xFF);
                 }
 
@@ -379,7 +320,7 @@ public class FastBlurOptimized extends FastBlurBase {
                 // 逆步骤2：固定循环右移
                 if (shift != 0) {
                     int unsigned = encryptedData[i] & 0xFF;
-                    int shifted = (unsigned >>> shift) | (unsigned << (8 - shift));
+                    int shifted = FastBlurUtils.rotateRight(unsigned, shift);
                     encryptedData[i] = (byte) (shifted & 0xFF);
                 }
                 
@@ -407,46 +348,46 @@ public class FastBlurOptimized extends FastBlurBase {
         int i = 0;
         for (; i <= len - 4; i += 4) {
             // 处理4个字节（逆序执行加密的逆操作）
-            int dynamicShift0 = (i + mask) & 0x7;
+            int dynamicShift0 = FastBlurUtils.getDynamicShift(i, mask);
             encryptedData[i] ^= kp2;
             if (dynamicShift0 != 0) {
                 int unsigned = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((unsigned >>> dynamicShift0) | (unsigned << (8 - dynamicShift0))) & 0xFF);
+                encryptedData[i] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift0) & 0xFF);
             }
             encryptedData[i] ^= kp1;
 
-            int dynamicShift1 = ((i + 1) + mask) & 0x7;
+            int dynamicShift1 = FastBlurUtils.getDynamicShift(i + 1, mask);
             encryptedData[i+1] ^= kp2;
             if (dynamicShift1 != 0) {
                 int unsigned = encryptedData[i+1] & 0xFF;
-                encryptedData[i+1] = (byte) (((unsigned >>> dynamicShift1) | (unsigned << (8 - dynamicShift1))) & 0xFF);
+                encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift1) & 0xFF);
             }
             encryptedData[i+1] ^= kp1;
 
-            int dynamicShift2 = ((i + 2) + mask) & 0x7;
+            int dynamicShift2 = FastBlurUtils.getDynamicShift(i + 2, mask);
             encryptedData[i+2] ^= kp2;
             if (dynamicShift2 != 0) {
                 int unsigned = encryptedData[i+2] & 0xFF;
-                encryptedData[i+2] = (byte) (((unsigned >>> dynamicShift2) | (unsigned << (8 - dynamicShift2))) & 0xFF);
+                encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift2) & 0xFF);
             }
             encryptedData[i+2] ^= kp1;
 
-            int dynamicShift3 = ((i + 3) + mask) & 0x7;
+            int dynamicShift3 = FastBlurUtils.getDynamicShift(i + 3, mask);
             encryptedData[i+3] ^= kp2;
             if (dynamicShift3 != 0) {
                 int unsigned = encryptedData[i+3] & 0xFF;
-                encryptedData[i+3] = (byte) (((unsigned >>> dynamicShift3) | (unsigned << (8 - dynamicShift3))) & 0xFF);
+                encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift3) & 0xFF);
             }
             encryptedData[i+3] ^= kp1;
         }
 
         // 处理剩余字节
         for (; i < len; i++) {
-            int dynamicShift = (i + mask) & 0x7;
+            int dynamicShift = FastBlurUtils.getDynamicShift(i, mask);
             encryptedData[i] ^= kp2;
             if (dynamicShift != 0) {
                 int unsigned = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift))) & 0xFF);
+                encryptedData[i] = (byte) (FastBlurUtils.rotateRight(unsigned, dynamicShift) & 0xFF);
             }
             encryptedData[i] ^= kp1;
         }
@@ -559,7 +500,7 @@ public class FastBlurOptimized extends FastBlurBase {
             if (end - start <= THRESHOLD) {
                 // 直接处理数据块
                 for (int i = start; i < end; i++) {
-                    int dynamicShift = (i + shiftMask) & 0x7;
+                    int dynamicShift = FastBlurUtils.getDynamicShift(i, shiftMask);
 
                     // 步骤1：第一段密钥异或
                     data[i] ^= keyPart1;
@@ -567,7 +508,7 @@ public class FastBlurOptimized extends FastBlurBase {
                     // 步骤2：动态循环左移
                     if (dynamicShift != 0) {
                         int unsigned = data[i] & 0xFF;
-                        int shifted = (unsigned << dynamicShift) | (unsigned >>> (8 - dynamicShift));
+                        int shifted = FastBlurUtils.rotateLeft(unsigned, dynamicShift);
                         data[i] = (byte) (shifted & 0xFF);
                     }
 
@@ -611,7 +552,7 @@ public class FastBlurOptimized extends FastBlurBase {
             if (end - start <= THRESHOLD) {
                 // 直接处理数据块
                 for (int i = start; i < end; i++) {
-                    int dynamicShift = (i + shiftMask) & 0x7;
+                    int dynamicShift = FastBlurUtils.getDynamicShift(i, shiftMask);
 
                     // 逆步骤3：第二段密钥异或还原
                     data[i] ^= keyPart2;
@@ -619,7 +560,7 @@ public class FastBlurOptimized extends FastBlurBase {
                     // 逆步骤2：动态循环右移
                     if (dynamicShift != 0) {
                         int unsigned = data[i] & 0xFF;
-                        int shifted = (unsigned >>> dynamicShift) | (unsigned << (8 - dynamicShift));
+                        int shifted = FastBlurUtils.rotateRight(unsigned, dynamicShift);
                         data[i] = (byte) (shifted & 0xFF);
                     }
 

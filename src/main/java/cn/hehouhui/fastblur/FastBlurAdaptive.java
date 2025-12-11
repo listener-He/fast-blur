@@ -36,22 +36,17 @@ public class FastBlurAdaptive extends FastBlurBase {
     /**
      * 极速版本实例（用于小数据处理）
      */
-    private final cn.hehouhui.fastblur.FastBlurUltra fastVersion;
+    private final FastBlurUltra fastVersion;
 
     /**
      * 向量化版本实例（用于中等数据处理）
      */
-    private final cn.hehouhui.fastblur.FastBlurVectorized vectorizedVersion;
+    private final FastBlurVectorized vectorizedVersion;
 
     /**
      * 优化版本实例（用于大数据处理）
      */
-    private final cn.hehouhui.fastblur.FastBlurOptimized optimizedVersion;
-    
-    /**
-     * 是否启用动态位移
-     */
-    private final boolean dynamicShift;
+    private final FastBlurOptimized optimizedVersion;
 
     /**
      * 默认构造函数，使用UTF-8字符集编码
@@ -138,12 +133,16 @@ public class FastBlurAdaptive extends FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     public FastBlurAdaptive(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
-        super(encoding, parallelProcessing);
-        this.dynamicShift = dynamicShift;
+        super(encoding, parallelProcessing, dynamicShift,
+              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+              dynamicShift ? shiftParam & 0xFF : 0,
+              dynamicShift ? 0 : shiftParam & 0x7);
+              
         // 初始化各个版本的实例
-        this.fastVersion = new cn.hehouhui.fastblur.FastBlurUltra(encoding, key, shiftParam, dynamicShift, parallelProcessing);
-        this.vectorizedVersion = new cn.hehouhui.fastblur.FastBlurVectorized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
-        this.optimizedVersion = new cn.hehouhui.fastblur.FastBlurOptimized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
+        this.fastVersion = new FastBlurUltra(encoding, key, shiftParam, dynamicShift, parallelProcessing);
+        this.vectorizedVersion = new FastBlurVectorized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
+        this.optimizedVersion = new FastBlurOptimized(encoding, key, shiftParam, dynamicShift, parallelProcessing);
     }
 
     /**

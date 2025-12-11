@@ -39,31 +39,6 @@ import java.util.concurrent.RecursiveAction;
 public class FastBlurVectorized extends FastBlurBase {
 
     /**
-     * 预计算的密钥片段1（用于异或运算）
-     */
-    private final byte keyPart1;
-
-    /**
-     * 预计算的密钥片段2（用于异或运算）
-     */
-    private final byte keyPart2;
-
-    /**
-     * 用于位移计算的掩码
-     */
-    private final int shiftMask;
-    
-    /**
-     * 固定位移值
-     */
-    private final int shift;
-    
-    /**
-     * 是否启用动态位移
-     */
-    private final boolean dynamicShift;
-
-    /**
      * 默认构造函数，使用UTF-8字符集编码
      *
      * <p>示例用法：
@@ -136,37 +111,11 @@ public class FastBlurVectorized extends FastBlurBase {
      * @param parallelProcessing 是否启用并行处理
      */
     public FastBlurVectorized(Charset encoding, long key, int shiftParam, boolean dynamicShift, boolean parallelProcessing) {
-        super(encoding, parallelProcessing);
-        this.dynamicShift = dynamicShift;
-        
-        if (dynamicShift) {
-            // 动态位移模式
-            // 预计算密钥片段，避免在每次加密/解密时重复计算
-            this.keyPart1 = (byte) (key & 0xFF);
-            this.keyPart2 = (byte) ((key >> 8) & 0xFF);
-            this.shiftMask = shiftParam & 0xFF;
-            this.shift = 0; // 固定位移值在动态模式下不使用
-        } else {
-            // 固定位移模式
-            this.keyPart1 = (byte) (key & 0xFF); // 用于异或运算的密钥
-            this.shift = shiftParam & 0x7; // 确保位移值在0-7之间
-            this.keyPart2 = 0; // 动态位移参数在固定模式下不使用
-            this.shiftMask = 0; // 动态位移参数在固定模式下不使用
-        }
-    }
-
-    /**
-     * 动态计算位移位数（核心增强点）
-     *
-     * <p>根据字节索引和密钥分段值动态计算位移位数，确保结果在0-7之间。
-     * 这种动态计算增加了算法的复杂度和安全性。</p>
-     *
-     * @param index 字节数组下标
-     * @return 0-7之间的位移数
-     */
-    private int getDynamicShift(int index) {
-        // 规则：下标 + 密钥分段值 取模8，保证位移数0-7
-        return (index + shiftMask) & 0x7; // 使用位运算代替取模运算，提高性能
+        super(encoding, parallelProcessing, dynamicShift,
+              dynamicShift ? (byte) (key & 0xFF) : (byte) (key & 0xFF),
+              dynamicShift ? (byte) ((key >> 8) & 0xFF) : (byte) 0,
+              dynamicShift ? shiftParam & 0xFF : 0,
+              dynamicShift ? 0 : shiftParam & 0x7);
     }
 
     /**
@@ -200,80 +149,80 @@ public class FastBlurVectorized extends FastBlurBase {
             // 主循环：每次处理8个字节
             for (; i <= len - 8; i += 8) {
                 // 批量计算位移值
-                final int s0 = (i + mask) & 0x7;
-                final int s1 = ((i + 1) + mask) & 0x7;
-                final int s2 = ((i + 2) + mask) & 0x7;
-                final int s3 = ((i + 3) + mask) & 0x7;
-                final int s4 = ((i + 4) + mask) & 0x7;
-                final int s5 = ((i + 5) + mask) & 0x7;
-                final int s6 = ((i + 6) + mask) & 0x7;
-                final int s7 = ((i + 7) + mask) & 0x7;
+                final int s0 = FastBlurUtils.getDynamicShift(i, mask);
+                final int s1 = FastBlurUtils.getDynamicShift(i + 1, mask);
+                final int s2 = FastBlurUtils.getDynamicShift(i + 2, mask);
+                final int s3 = FastBlurUtils.getDynamicShift(i + 3, mask);
+                final int s4 = FastBlurUtils.getDynamicShift(i + 4, mask);
+                final int s5 = FastBlurUtils.getDynamicShift(i + 5, mask);
+                final int s6 = FastBlurUtils.getDynamicShift(i + 6, mask);
+                final int s7 = FastBlurUtils.getDynamicShift(i + 7, mask);
 
                 // 批量处理加密操作
                 data[i] ^= kp1;
                 if (s0 != 0) {
                     final int u = data[i] & 0xFF;
-                    data[i] = (byte) (((u << s0) | (u >>> (8 - s0))) & 0xFF);
+                    data[i] = (byte) (FastBlurUtils.rotateLeft(u, s0) & 0xFF);
                 }
                 data[i] ^= kp2;
 
                 data[i+1] ^= kp1;
                 if (s1 != 0) {
                     final int u = data[i+1] & 0xFF;
-                    data[i+1] = (byte) (((u << s1) | (u >>> (8 - s1))) & 0xFF);
+                    data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
                 }
                 data[i+1] ^= kp2;
 
                 data[i+2] ^= kp1;
                 if (s2 != 0) {
                     final int u = data[i+2] & 0xFF;
-                    data[i+2] = (byte) (((u << s2) | (u >>> (8 - s2))) & 0xFF);
+                    data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
                 }
                 data[i+2] ^= kp2;
 
                 data[i+3] ^= kp1;
                 if (s3 != 0) {
                     final int u = data[i+3] & 0xFF;
-                    data[i+3] = (byte) (((u << s3) | (u >>> (8 - s3))) & 0xFF);
+                    data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
                 }
                 data[i+3] ^= kp2;
 
                 data[i+4] ^= kp1;
                 if (s4 != 0) {
                     final int u = data[i+4] & 0xFF;
-                    data[i+4] = (byte) (((u << s4) | (u >>> (8 - s4))) & 0xFF);
+                    data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
                 }
                 data[i+4] ^= kp2;
 
                 data[i+5] ^= kp1;
                 if (s5 != 0) {
                     final int u = data[i+5] & 0xFF;
-                    data[i+5] = (byte) (((u << s5) | (u >>> (8 - s5))) & 0xFF);
+                    data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
                 }
                 data[i+5] ^= kp2;
 
                 data[i+6] ^= kp1;
                 if (s6 != 0) {
                     final int u = data[i+6] & 0xFF;
-                    data[i+6] = (byte) (((u << s6) | (u >>> (8 - s6))) & 0xFF);
+                    data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
                 }
                 data[i+6] ^= kp2;
 
                 data[i+7] ^= kp1;
                 if (s7 != 0) {
                     final int u = data[i+7] & 0xFF;
-                    data[i+7] = (byte) (((u << s7) | (u >>> (8 - s7))) & 0xFF);
+                    data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
                 }
                 data[i+7] ^= kp2;
             }
 
             // 处理剩余不足8个字节的数据
             for (; i < len; i++) {
-                final int shift = (i + mask) & 0x7;
+                final int shift = FastBlurUtils.getDynamicShift(i, mask);
                 data[i] ^= kp1;
                 if (shift != 0) {
                     final int u = data[i] & 0xFF;
-                    data[i] = (byte) (((u << shift) | (u >>> (8 - shift))) & 0xFF);
+                    data[i] = (byte) (FastBlurUtils.rotateLeft(u, shift) & 0xFF);
                 }
                 data[i] ^= kp2;
             }
@@ -291,49 +240,49 @@ public class FastBlurVectorized extends FastBlurBase {
                 data[i] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i] & 0xFF;
-                    data[i] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+1] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+1] & 0xFF;
-                    data[i+1] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+2] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+2] & 0xFF;
-                    data[i+2] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+3] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+3] & 0xFF;
-                    data[i+3] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+4] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+4] & 0xFF;
-                    data[i+4] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+5] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+5] & 0xFF;
-                    data[i+5] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+6] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+6] & 0xFF;
-                    data[i+6] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
 
                 data[i+7] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i+7] & 0xFF;
-                    data[i+7] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
             }
 
@@ -342,7 +291,7 @@ public class FastBlurVectorized extends FastBlurBase {
                 data[i] ^= kp1;
                 if (sh != 0) {
                     final int u = data[i] & 0xFF;
-                    data[i] = (byte) (((u << sh) | (u >>> (8 - sh))) & 0xFF);
+                    data[i] = (byte) (FastBlurUtils.rotateLeft(u, sh) & 0xFF);
                 }
             }
         }
@@ -379,80 +328,80 @@ public class FastBlurVectorized extends FastBlurBase {
         // 主循环：每次处理8个字节
         for (; i <= len - 8; i += 8) {
             // 批量计算位移值
-            final int s0 = (i + mask) & 0x7;
-            final int s1 = ((i + 1) + mask) & 0x7;
-            final int s2 = ((i + 2) + mask) & 0x7;
-            final int s3 = ((i + 3) + mask) & 0x7;
-            final int s4 = ((i + 4) + mask) & 0x7;
-            final int s5 = ((i + 5) + mask) & 0x7;
-            final int s6 = ((i + 6) + mask) & 0x7;
-            final int s7 = ((i + 7) + mask) & 0x7;
+            final int s0 = FastBlurUtils.getDynamicShift(i, mask);
+            final int s1 = FastBlurUtils.getDynamicShift(i + 1, mask);
+            final int s2 = FastBlurUtils.getDynamicShift(i + 2, mask);
+            final int s3 = FastBlurUtils.getDynamicShift(i + 3, mask);
+            final int s4 = FastBlurUtils.getDynamicShift(i + 4, mask);
+            final int s5 = FastBlurUtils.getDynamicShift(i + 5, mask);
+            final int s6 = FastBlurUtils.getDynamicShift(i + 6, mask);
+            final int s7 = FastBlurUtils.getDynamicShift(i + 7, mask);
 
             // 批量处理解密操作（逆序执行加密的逆操作）
             encryptedData[i] ^= kp2;
             if (s0 != 0) {
                 final int u = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((u >>> s0) | (u << (8 - s0))) & 0xFF);
+                encryptedData[i] = (byte) (FastBlurUtils.rotateRight(u, s0) & 0xFF);
             }
             encryptedData[i] ^= kp1;
 
             encryptedData[i+1] ^= kp2;
             if (s1 != 0) {
                 final int u = encryptedData[i+1] & 0xFF;
-                encryptedData[i+1] = (byte) (((u >>> s1) | (u << (8 - s1))) & 0xFF);
+                encryptedData[i+1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
             }
             encryptedData[i+1] ^= kp1;
 
             encryptedData[i+2] ^= kp2;
             if (s2 != 0) {
                 final int u = encryptedData[i+2] & 0xFF;
-                encryptedData[i+2] = (byte) (((u >>> s2) | (u << (8 - s2))) & 0xFF);
+                encryptedData[i+2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
             }
             encryptedData[i+2] ^= kp1;
 
             encryptedData[i+3] ^= kp2;
             if (s3 != 0) {
                 final int u = encryptedData[i+3] & 0xFF;
-                encryptedData[i+3] = (byte) (((u >>> s3) | (u << (8 - s3))) & 0xFF);
+                encryptedData[i+3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
             }
             encryptedData[i+3] ^= kp1;
 
             encryptedData[i+4] ^= kp2;
             if (s4 != 0) {
                 final int u = encryptedData[i+4] & 0xFF;
-                encryptedData[i+4] = (byte) (((u >>> s4) | (u << (8 - s4))) & 0xFF);
+                encryptedData[i+4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
             }
             encryptedData[i+4] ^= kp1;
 
             encryptedData[i+5] ^= kp2;
             if (s5 != 0) {
                 final int u = encryptedData[i+5] & 0xFF;
-                encryptedData[i+5] = (byte) (((u >>> s5) | (u << (8 - s5))) & 0xFF);
+                encryptedData[i+5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
             }
             encryptedData[i+5] ^= kp1;
 
             encryptedData[i+6] ^= kp2;
             if (s6 != 0) {
                 final int u = encryptedData[i+6] & 0xFF;
-                encryptedData[i+6] = (byte) (((u >>> s6) | (u << (8 - s6))) & 0xFF);
+                encryptedData[i+6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
             }
             encryptedData[i+6] ^= kp1;
 
             encryptedData[i+7] ^= kp2;
             if (s7 != 0) {
                 final int u = encryptedData[i+7] & 0xFF;
-                encryptedData[i+7] = (byte) (((u >>> s7) | (u << (8 - s7))) & 0xFF);
+                encryptedData[i+7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
             }
             encryptedData[i+7] ^= kp1;
         }
 
         // 处理剩余不足8个字节的数据
         for (; i < len; i++) {
-            final int shift = (i + mask) & 0x7;
+            final int shift = FastBlurUtils.getDynamicShift(i, mask);
             encryptedData[i] ^= kp2;
             if (shift != 0) {
                 final int u = encryptedData[i] & 0xFF;
-                encryptedData[i] = (byte) (((u >>> shift) | (u << (8 - shift))) & 0xFF);
+                encryptedData[i] = (byte) (FastBlurUtils.rotateRight(u, shift) & 0xFF);
             }
             encryptedData[i] ^= kp1;
         }
@@ -573,80 +522,80 @@ public class FastBlurVectorized extends FastBlurBase {
                 // 主循环：每次处理8个字节
                 for (; i <= end - 8; i += 8) {
                     // 批量计算位移值
-                    final int s0 = (i + mask) & 0x7;
-                    final int s1 = ((i + 1) + mask) & 0x7;
-                    final int s2 = ((i + 2) + mask) & 0x7;
-                    final int s3 = ((i + 3) + mask) & 0x7;
-                    final int s4 = ((i + 4) + mask) & 0x7;
-                    final int s5 = ((i + 5) + mask) & 0x7;
-                    final int s6 = ((i + 6) + mask) & 0x7;
-                    final int s7 = ((i + 7) + mask) & 0x7;
+                    final int s0 = FastBlurUtils.getDynamicShift(i, mask);
+                    final int s1 = FastBlurUtils.getDynamicShift(i + 1, mask);
+                    final int s2 = FastBlurUtils.getDynamicShift(i + 2, mask);
+                    final int s3 = FastBlurUtils.getDynamicShift(i + 3, mask);
+                    final int s4 = FastBlurUtils.getDynamicShift(i + 4, mask);
+                    final int s5 = FastBlurUtils.getDynamicShift(i + 5, mask);
+                    final int s6 = FastBlurUtils.getDynamicShift(i + 6, mask);
+                    final int s7 = FastBlurUtils.getDynamicShift(i + 7, mask);
 
                     // 批量处理加密操作
                     data[i] ^= kp1;
                     if (s0 != 0) {
                         final int u = data[i] & 0xFF;
-                        data[i] = (byte) (((u << s0) | (u >>> (8 - s0))) & 0xFF);
+                        data[i] = (byte) (FastBlurUtils.rotateLeft(u, s0) & 0xFF);
                     }
                     data[i] ^= kp2;
 
                     data[i+1] ^= kp1;
                     if (s1 != 0) {
                         final int u = data[i+1] & 0xFF;
-                        data[i+1] = (byte) (((u << s1) | (u >>> (8 - s1))) & 0xFF);
+                        data[i+1] = (byte) (FastBlurUtils.rotateLeft(u, s1) & 0xFF);
                     }
                     data[i+1] ^= kp2;
 
                     data[i+2] ^= kp1;
                     if (s2 != 0) {
                         final int u = data[i+2] & 0xFF;
-                        data[i+2] = (byte) (((u << s2) | (u >>> (8 - s2))) & 0xFF);
+                        data[i+2] = (byte) (FastBlurUtils.rotateLeft(u, s2) & 0xFF);
                     }
                     data[i+2] ^= kp2;
 
                     data[i+3] ^= kp1;
                     if (s3 != 0) {
                         final int u = data[i+3] & 0xFF;
-                        data[i+3] = (byte) (((u << s3) | (u >>> (8 - s3))) & 0xFF);
+                        data[i+3] = (byte) (FastBlurUtils.rotateLeft(u, s3) & 0xFF);
                     }
                     data[i+3] ^= kp2;
 
                     data[i+4] ^= kp1;
                     if (s4 != 0) {
                         final int u = data[i+4] & 0xFF;
-                        data[i+4] = (byte) (((u << s4) | (u >>> (8 - s4))) & 0xFF);
+                        data[i+4] = (byte) (FastBlurUtils.rotateLeft(u, s4) & 0xFF);
                     }
                     data[i+4] ^= kp2;
 
                     data[i+5] ^= kp1;
                     if (s5 != 0) {
                         final int u = data[i+5] & 0xFF;
-                        data[i+5] = (byte) (((u << s5) | (u >>> (8 - s5))) & 0xFF);
+                        data[i+5] = (byte) (FastBlurUtils.rotateLeft(u, s5) & 0xFF);
                     }
                     data[i+5] ^= kp2;
 
                     data[i+6] ^= kp1;
                     if (s6 != 0) {
                         final int u = data[i+6] & 0xFF;
-                        data[i+6] = (byte) (((u << s6) | (u >>> (8 - s6))) & 0xFF);
+                        data[i+6] = (byte) (FastBlurUtils.rotateLeft(u, s6) & 0xFF);
                     }
                     data[i+6] ^= kp2;
 
                     data[i+7] ^= kp1;
                     if (s7 != 0) {
                         final int u = data[i+7] & 0xFF;
-                        data[i+7] = (byte) (((u << s7) | (u >>> (8 - s7))) & 0xFF);
+                        data[i+7] = (byte) (FastBlurUtils.rotateLeft(u, s7) & 0xFF);
                     }
                     data[i+7] ^= kp2;
                 }
 
                 // 处理剩余不足8个字节的数据
                 for (; i < end; i++) {
-                    final int shift = (i + mask) & 0x7;
+                    final int shift = FastBlurUtils.getDynamicShift(i, mask);
                     data[i] ^= kp1;
                     if (shift != 0) {
                         final int u = data[i] & 0xFF;
-                        data[i] = (byte) (((u << shift) | (u >>> (8 - shift))) & 0xFF);
+                        data[i] = (byte) (FastBlurUtils.rotateLeft(u, shift) & 0xFF);
                     }
                     data[i] ^= kp2;
                 }
@@ -695,80 +644,80 @@ public class FastBlurVectorized extends FastBlurBase {
                 // 主循环：每次处理8个字节
                 for (; i <= end - 8; i += 8) {
                     // 批量计算位移值
-                    final int s0 = (i + mask) & 0x7;
-                    final int s1 = ((i + 1) + mask) & 0x7;
-                    final int s2 = ((i + 2) + mask) & 0x7;
-                    final int s3 = ((i + 3) + mask) & 0x7;
-                    final int s4 = ((i + 4) + mask) & 0x7;
-                    final int s5 = ((i + 5) + mask) & 0x7;
-                    final int s6 = ((i + 6) + mask) & 0x7;
-                    final int s7 = ((i + 7) + mask) & 0x7;
+                    final int s0 = FastBlurUtils.getDynamicShift(i, mask);
+                    final int s1 = FastBlurUtils.getDynamicShift(i + 1, mask);
+                    final int s2 = FastBlurUtils.getDynamicShift(i + 2, mask);
+                    final int s3 = FastBlurUtils.getDynamicShift(i + 3, mask);
+                    final int s4 = FastBlurUtils.getDynamicShift(i + 4, mask);
+                    final int s5 = FastBlurUtils.getDynamicShift(i + 5, mask);
+                    final int s6 = FastBlurUtils.getDynamicShift(i + 6, mask);
+                    final int s7 = FastBlurUtils.getDynamicShift(i + 7, mask);
 
                     // 批量处理解密操作（逆序执行加密的逆操作）
                     data[i] ^= kp2;
                     if (s0 != 0) {
                         final int u = data[i] & 0xFF;
-                        data[i] = (byte) (((u >>> s0) | (u << (8 - s0))) & 0xFF);
+                        data[i] = (byte) (FastBlurUtils.rotateRight(u, s0) & 0xFF);
                     }
                     data[i] ^= kp1;
 
                     data[i+1] ^= kp2;
                     if (s1 != 0) {
                         final int u = data[i+1] & 0xFF;
-                        data[i+1] = (byte) (((u >>> s1) | (u << (8 - s1))) & 0xFF);
+                        data[i+1] = (byte) (FastBlurUtils.rotateRight(u, s1) & 0xFF);
                     }
                     data[i+1] ^= kp1;
 
                     data[i+2] ^= kp2;
                     if (s2 != 0) {
                         final int u = data[i+2] & 0xFF;
-                        data[i+2] = (byte) (((u >>> s2) | (u << (8 - s2))) & 0xFF);
+                        data[i+2] = (byte) (FastBlurUtils.rotateRight(u, s2) & 0xFF);
                     }
                     data[i+2] ^= kp1;
 
                     data[i+3] ^= kp2;
                     if (s3 != 0) {
                         final int u = data[i+3] & 0xFF;
-                        data[i+3] = (byte) (((u >>> s3) | (u << (8 - s3))) & 0xFF);
+                        data[i+3] = (byte) (FastBlurUtils.rotateRight(u, s3) & 0xFF);
                     }
                     data[i+3] ^= kp1;
 
                     data[i+4] ^= kp2;
                     if (s4 != 0) {
                         final int u = data[i+4] & 0xFF;
-                        data[i+4] = (byte) (((u >>> s4) | (u << (8 - s4))) & 0xFF);
+                        data[i+4] = (byte) (FastBlurUtils.rotateRight(u, s4) & 0xFF);
                     }
                     data[i+4] ^= kp1;
 
                     data[i+5] ^= kp2;
                     if (s5 != 0) {
                         final int u = data[i+5] & 0xFF;
-                        data[i+5] = (byte) (((u >>> s5) | (u << (8 - s5))) & 0xFF);
+                        data[i+5] = (byte) (FastBlurUtils.rotateRight(u, s5) & 0xFF);
                     }
                     data[i+5] ^= kp1;
 
                     data[i+6] ^= kp2;
                     if (s6 != 0) {
                         final int u = data[i+6] & 0xFF;
-                        data[i+6] = (byte) (((u >>> s6) | (u << (8 - s6))) & 0xFF);
+                        data[i+6] = (byte) (FastBlurUtils.rotateRight(u, s6) & 0xFF);
                     }
                     data[i+6] ^= kp1;
 
                     data[i+7] ^= kp2;
                     if (s7 != 0) {
                         final int u = data[i+7] & 0xFF;
-                        data[i+7] = (byte) (((u >>> s7) | (u << (8 - s7))) & 0xFF);
+                        data[i+7] = (byte) (FastBlurUtils.rotateRight(u, s7) & 0xFF);
                     }
                     data[i+7] ^= kp1;
                 }
 
                 // 处理剩余不足8个字节的数据
                 for (; i < end; i++) {
-                    final int shift = (i + mask) & 0x7;
+                    final int shift = FastBlurUtils.getDynamicShift(i, mask);
                     data[i] ^= kp2;
                     if (shift != 0) {
                         final int u = data[i] & 0xFF;
-                        data[i] = (byte) (((u >>> shift) | (u << (8 - shift))) & 0xFF);
+                        data[i] = (byte) (FastBlurUtils.rotateRight(u, shift) & 0xFF);
                     }
                     data[i] ^= kp1;
                 }
