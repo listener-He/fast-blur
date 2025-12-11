@@ -136,12 +136,12 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 根据配置决定是否使用并行处理
-        if (parallelProcessing && data.length >= 32768) {
+        if (parallelProcessing && data.length >= 8192) {
             return encryptParallel(data);
         }
 
-        // 对于小数据(<=64字节)，使用展开循环优化
-        if (data.length <= 64) {
+        // 对于小数据(<=128字节)，使用展开循环优化
+        if (data.length <= 128) {
             return encryptUnrolled(data);
         }
 
@@ -172,8 +172,8 @@ public class FastBlurSimple extends FastBlurBase {
         
         // 展开循环以减少分支开销
         int i = 0;
-        for (; i <= len - 4; i += 4) {
-            // 处理4个字节
+        for (; i <= len - 8; i += 8) {
+            // 处理8个字节
             data[i] ^= key;
             if (shift != 0) {
                 int unsigned = data[i] & 0xFF;
@@ -196,6 +196,30 @@ public class FastBlurSimple extends FastBlurBase {
             if (shift != 0) {
                 int unsigned = data[i+3] & 0xFF;
                 data[i+3] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+4] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+4] & 0xFF;
+                data[i+4] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+5] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+5] & 0xFF;
+                data[i+5] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+6] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+6] & 0xFF;
+                data[i+6] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
+            }
+            
+            data[i+7] ^= key;
+            if (shift != 0) {
+                int unsigned = data[i+7] & 0xFF;
+                data[i+7] = (byte) (((unsigned << shift) | (unsigned >>> (8 - shift))) & 0xFF);
             }
         }
         
@@ -236,12 +260,12 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 根据配置决定是否使用并行处理
-        if (parallelProcessing && encryptedData.length >= 32768) {
+        if (parallelProcessing && encryptedData.length >= 8192) {
             return decryptParallel(encryptedData);
         }
 
-        // 对于小数据(<=64字节)，使用展开循环优化
-        if (encryptedData.length <= 64) {
+        // 对于小数据(<=128字节)，使用展开循环优化
+        if (encryptedData.length <= 128) {
             return decryptUnrolled(encryptedData);
         }
 
@@ -262,7 +286,7 @@ public class FastBlurSimple extends FastBlurBase {
 
     /**
      * 展开循环的小数据解密方法
-     * 专门为小数据(<=64字节)优化性能
+     * 专门为小数据(<=128字节)优化性能
      *
      * @param encryptedData 加密后的字节数组
      * @return 原始字节数组
@@ -272,8 +296,8 @@ public class FastBlurSimple extends FastBlurBase {
         
         // 展开循环以减少分支开销
         int i = 0;
-        for (; i <= len - 4; i += 4) {
-            // 处理4个字节
+        for (; i <= len - 8; i += 8) {
+            // 处理8个字节
             if (shift != 0) {
                 int unsigned = encryptedData[i] & 0xFF;
                 encryptedData[i] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
@@ -297,6 +321,30 @@ public class FastBlurSimple extends FastBlurBase {
                 encryptedData[i+3] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
             }
             encryptedData[i+3] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+4] & 0xFF;
+                encryptedData[i+4] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+4] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+5] & 0xFF;
+                encryptedData[i+5] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+5] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+6] & 0xFF;
+                encryptedData[i+6] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+6] ^= key;
+            
+            if (shift != 0) {
+                int unsigned = encryptedData[i+7] & 0xFF;
+                encryptedData[i+7] = (byte) (((unsigned >>> shift) | (unsigned << (8 - shift))) & 0xFF);
+            }
+            encryptedData[i+7] ^= key;
         }
         
         // 处理剩余字节
@@ -414,7 +462,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 32768) {
+        if (parallelProcessing && length >= 8192) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -453,7 +501,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 32768) {
+        if (parallelProcessing && length >= 8192) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
@@ -493,7 +541,7 @@ public class FastBlurSimple extends FastBlurBase {
         }
 
         // 如果启用了并行处理且数据足够大，则使用并行处理
-        if (parallelProcessing && length >= 32768) {
+        if (parallelProcessing && length >= 8192) {
             byte[] temp = new byte[length];
             buffer.position(offset);
             buffer.get(temp);
